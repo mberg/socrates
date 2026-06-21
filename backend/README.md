@@ -50,12 +50,6 @@ Run the full test suite:
 cd backend && uv run pytest -v
 ```
 
-Run tests with coverage:
-
-```bash
-cd backend && uv run pytest --cov=app tests/
-```
-
 ## Database
 
 Apply migrations (required for production runs):

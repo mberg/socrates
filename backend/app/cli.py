@@ -1,5 +1,6 @@
 import argparse
 import asyncio
+import re
 from collections import Counter
 from pathlib import Path
 
@@ -11,22 +12,36 @@ from app.storage import InMemoryObjectStore, R2ObjectStore
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+_GRADE_FILE_RE = re.compile(r"^grade[-_]\d+[-_]")
+
 
 def discover_pdfs(root: str) -> list[str]:
-    return sorted(str(p) for p in Path(root).rglob("grade-*-*.pdf"))
+    return sorted(
+        str(p)
+        for p in Path(root).rglob("*.pdf")
+        if _GRADE_FILE_RE.match(p.name)
+    )
 
 
-async def _run(root: str, dry_run: bool) -> int:
+async def _run(root: str, dry_run: bool, *, extractor=None, store=None, loader=None) -> int:
     await create_all()
-    extractor = GeminiExtractor(settings.gemini_api_key)
-    store = InMemoryObjectStore() if dry_run else R2ObjectStore()
+    if extractor is None:
+        extractor = GeminiExtractor(settings.gemini_api_key)
+    if store is None:
+        store = InMemoryObjectStore() if dry_run else R2ObjectStore()
     factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     counts: Counter[str] = Counter()
+    ingest_kwargs = {} if loader is None else {"loader": loader}
     for path in discover_pdfs(root):
         async with factory() as session:
-            outcome = await ingest_pdf(path, session=session, extractor=extractor, store=store)
-        counts[outcome.status] += 1
-        print(f"{outcome.status:11} {path}")
+            try:
+                outcome = await ingest_pdf(path, session=session, extractor=extractor, store=store,
+                                           **ingest_kwargs)
+                counts[outcome.status] += 1
+                print(f"{outcome.status:11} {path}")
+            except Exception as e:
+                counts["errored"] += 1
+                print(f"errored     {path}: {type(e).__name__}: {e}")
     print(f"\nSummary: {dict(counts)}")
     return 0
 
