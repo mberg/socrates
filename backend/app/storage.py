@@ -7,6 +7,7 @@ from app.config import settings
 
 class ObjectStore(Protocol):
     def put(self, key: str, data: bytes, content_type: str) -> str: ...
+    def get(self, key: str) -> bytes: ...
 
 
 class InMemoryObjectStore:
@@ -16,6 +17,9 @@ class InMemoryObjectStore:
     def put(self, key: str, data: bytes, content_type: str) -> str:
         self.objects[key] = data
         return key
+
+    def get(self, key: str) -> bytes:
+        return self.objects[key]
 
 
 class R2ObjectStore:
@@ -31,3 +35,7 @@ class R2ObjectStore:
     def put(self, key: str, data: bytes, content_type: str) -> str:
         self._client.put_object(Bucket=self._bucket, Key=key, Body=data, ContentType=content_type)
         return key
+
+    def get(self, key: str) -> bytes:
+        resp = self._client.get_object(Bucket=self._bucket, Key=key)
+        return resp["Body"].read()
