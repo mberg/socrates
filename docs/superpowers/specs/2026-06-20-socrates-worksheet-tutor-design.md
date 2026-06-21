@@ -1,11 +1,11 @@
 ---
-version: 0.2.0
-last_modified: 2026-06-21T03:37:00.000Z
+version: 0.3.0
+last_modified: 2026-06-21T04:01:44.000Z
 ---
 # Socrates — Worksheet Tutor & Progress System
-<sub>`v0.2.0 · Last modified Jun 20, 2026 at 11:37 PM EDT`</sub>
+<sub>`v0.3.0 · Last modified Jun 21, 2026 at 12:01 AM EDT`</sub>
 
-{>>Process note (claude): reconciled your web edits with my unpushed local changes — merged and took your edited version as the base. Heads-up: the tutor-interaction detail we agreed in chat (hybrid component output, voice-to-text input, and a TutorTurn record) is NOT in this version yet — I deferred it to the next rewrite pass so this review stays replies-only. Version stamping starts here.<<}{id="c2" by="claude" at="2026-06-21T03:37:00.000Z"}
+{>>Process note (claude): rewrite pass v0.3.0 — re-folded the deferred tutor-interaction detail (new §7.1 + TutorTurn in §11), added the section-selection menu (new §8.1), expanded ingestion (§13) with the filename-derived skill taxonomy, and fixed the §14 voice scope. Resolved comments c1/c3. Delete this note once read.<<}{id="c4" by="claude" at="2026-06-21T04:01:44.000Z"}
 
 **Design doc** · 2026-06-20
 ## 1. Purpose
@@ -66,7 +66,7 @@ Every printed sheet carries a **QR code** encoding the `Attempt` id. This is the
 3. Each read is aligned to a `Problem` (via QR-known layout) and compared to the stored correct answer.
 4. `ProblemResult` per problem: what Gemini read, correct?, and **confidence**. **Low-confidence reads are flagged for the parent to review** rather than silently trusted.
 5. Score + results stream to the UI; mastery and XP update.
-## {==7. Guidance / tutoring (the "Socrates" core)==}{>>I want to also be able to select a section too. So it can be driven a bit by the student or parent on what to work with.  we'll start from the beginning and advance based on how the child is doing though.<<}{id="c1" by="mberg" at="2026-06-21T03:29:29.152Z"} {>>Reply (claude): Agreed — we'll layer student/parent choice on top of the recommender. Default stays as you describe: start at the beginning of the grade's sequence and auto-advance based on performance; a manual pick just steers focus. Two things so I build §8 right: (1) What grain is a "section" — a topic area (e.g. Fractions), a single skill, or an ordered curriculum sequence to walk through? (2) Should a manual pick temporarily override the recommender ("work on this right now"), or set a persistent focus the recommender then prioritizes within? Tell me and I'll fold it into §8 on the next rewrite pass.<<}{id="c3" by="claude" at="2026-06-21T03:37:00.000Z" re="c1"}
+## 7. Guidance / tutoring (the "Socrates" core)
 Tiered, chat-style tutor that **never reveals the answer until Tier 3**:
 
 1. **Tier 1 – Nudge:** a guiding question, no numbers given away.
@@ -82,6 +82,17 @@ Tiered, chat-style tutor that **never reveals the answer until Tier 3**:
 **Grounding** (what the tutor is given): the exact problem text, the correct answer (from the parsed answer key), the **worked example** printed on the sheet (anchors hints to the method the sheet teaches), and the child's wrong/partial answer when available.
 
 **Hint-load is a mastery signal:** a problem answered right only after heavy hinting is *not* mastered. Every help request is recorded (see `GuidanceSession`).
+
+### 7.1 Tutor interaction (how the kid talks to the tutor)
+A help session is an **interactive, generated chat thread scoped to one problem**, seeded with the grounding above (problem text, correct answer, worked example, and a crop of the child's handwriting when a scan is attached). Tier state is enforced **server-side** — the answer is not revealed until Tier 3 is unlocked. Every turn is logged.
+
+**Input — modality-agnostic (v1: text + voice-to-text).** A "turn" is text regardless of how it was produced. v1 supports **typing** and **browser speech-to-text** (Web Speech API) so the child can *talk and get written responses* — important for the younger child, who types slowly. Future upgrade: **Gemini Live** real-time spoken tutoring (child talks, tutor talks back) and browser text-to-speech; the modality-agnostic turn model lets these drop in without reworking the tutor.
+
+**Output — hybrid rich content.** Each tutor turn is a **structured payload**, not raw model HTML: a `say` field of **Markdown + KaTeX** prose, plus optional **`visual` actions** the model "calls" like tools and parameterizes, rendered by a **trusted, kid-friendly React component library** (number line, fraction bars, place-value blocks, multiplication grid, step-by-step list, KaTeX math). The model **cannot inject arbitrary HTML** — it only selects and parameterizes vetted components, keeping the kid-facing surface safe, consistent, and on-brand. For math, **SVG components are preferred over AI-generated images** (precise, instant, cheap; image models get spacing/quantities wrong). The tutor can also **show a crop of the child's own scanned handwriting** as a grounding visual ("here's the 54 you wrote").
+
+**One provider:** the Gemini family powers vision (grading), tutor chat, and later live audio — a single integration, swappable behind the `vision` / `tutor` interfaces.
+
+**Safety (kid-facing AI):** the system prompt keeps the tutor on the current problem, age-appropriate, and tier-respecting; structured output (no raw HTML) removes injection/rendering risk; tier unlock is server-enforced, not left to the model.
 ## 8. Mastery + recommendation engine
 **Mastery is per child × skill**, an explainable score (no heavy ML), updated after each grade and guidance session from three signals:
 
@@ -96,6 +107,9 @@ Skill states: **Not started → Learning → Practicing → Mastered.**
 - Prioritize weak/unmastered skills.
 - Interleave spaced review of recently-learned skills.
 - Stay in the child's grade, **don't repeat the exact worksheet** (pick another in the same skill or **generate** one), keep variety.
+
+### 8.1 Navigation & section selection
+The recommender is the **default** "what's next" surface, but it never locks the child in. Alongside it, a **browse menu mirrors the worksheet taxonomy** — grade → **topic (category)** → **skill (section)** — so a student or parent can **jump into any area and practice or print whatever they want**. This reuses the §11 `Skill → Worksheet` structure directly; no new model needed. The default journey still starts at the beginning of the grade and **auto-advances based on performance**, but free navigation is always available. Manual choice is **free navigation, not a focus-lock** — picking an area doesn't reconfigure the recommender, it just lets them work where they want. Incentives stay honest because **mastery-based diminishing XP (§9) applies however a skill is chosen**: self-selecting a mastered area earns little, so free choice can't be used to farm points. {>>Resolved c1/c3 (claude): grain = the worksheet's own categories/sections via a browse menu; recommender stays the default; free navigation, not a focus-lock; diminishing XP keeps it honest. Delete when read.<<}{id="c5" by="claude" at="2026-06-21T04:01:44.000Z"}
 ## 9. Gamification + summer campaign
 - **Campaign:** per child, with start/end dates and a goal (e.g., "master 30 skills" / "complete 60 sheets"), shown as a progress bar with milestones.
 - **Points (XP):** correct answers earn XP; bonuses for first-try-correct, completing a sheet, and **mastering a skill** (the big reward). **Mastered skills pay diminishing XP**, so easy sheets can't be farmed — points pull toward new/weak skills, same direction as the recommender. Asking for help never *costs* points (we don't punish help-seeking); it just forgoes the first-try bonus.
@@ -127,6 +141,7 @@ When the library lacks a fresh sheet for a needed skill (or the recommender want
 - **Submission** — one uploaded photo against an Attempt (R2 key, timestamp); immutable. An Attempt may have several (re-scan).
 - **ProblemResult** — per problem on a graded submission: Gemini's read, correct?, confidence; immutable.
 - **GuidanceSession** — a help event: child, worksheet, problem, timestamp, entry point (scan / in-app / post-grade), max tier reached, resolved?, scan-attached?; immutable.
+- **TutorTurn** — append-only, one row per chat turn in a `GuidanceSession`: role (child / tutor), text, input source (typed / voice), any `visual` components emitted, and the tier active at that turn. Enables full session replay and fine-grained hint-load signal.
 
 **Learning signals & analytics:**
 
@@ -140,16 +155,24 @@ When the library lacks a fresh sheet for a needed skill (or the recommender want
 ## 12. Analytics / dashboard (data now, UI later)
 The data model above captures everything the per-child dashboard will need; the dashboard UI itself is **deferred**. With no further schema changes it can later show: accuracy & hint-load over time, mastery progression per skill, a topic heatmap, engagement/streak vs. the campaign, time-per-sheet, and "struggled most with" rankings — per child.
 ## 13. Ingestion (one-time, then on generation)
-For each source PDF: extract page 1 (worksheet) and page 2 (answer key) via `pdftotext`; parse the title, worked example, and per-problem prompt + correct answer (model-assisted where layout is messy); upload the source PDF to R2; create `Skill` / `Worksheet` / `Problem` rows. Folder → grade/topic mapping seeds the `Skill` taxonomy.
+A one-time offline batch (an arq job / CLI command, parallelized over the ~2,400 sheets) populates `Skill / Worksheet / Problem`. Generated worksheets reuse the tail of this same pipeline.
+
+**Skill taxonomy is derived from filenames — not hand-authored.** Stripping the grade prefix and the trailing variant letter collapses the library into skills: `grade-5-area-of-circles-a … -f.pdf` → Skill `area-of-circles`, with those files as interchangeable Worksheets. Grade 5 alone is ~1,128 PDFs → **~263 distinct skills**; the page-1 title ("Area of circles") is the human label; the folder is the topic/category. A few filenames break the `-[a-z]` convention (e.g. `…-cdf.pdf`, or no letter) — the normalizer tolerates these and **flags oddballs to quarantine** rather than mis-binning them.
+
+**Per-PDF extraction — vision-primary, text as cross-check.** For each PDF: split page 1 (worksheet) / page 2 (answer key) with PyMuPDF; get `pdftotext` for both pages *and* render both pages to images; then one **Gemini call with a strict structured-output schema** → `{ title, instructions, worked_example, problems: [{ number, prompt, correct_answer }] }`, fed **both the page image and the extracted text** (the image handles fractions / geometry / long division / tables that text mangles; the text grounds it and curbs hallucination). Page 2 supplies the answers, page 1 the clean prompts. Vision-primary is chosen because the content is visual math across ~263 skills where regex-on-text is brittle, and because reading a clean printed sheet is far easier than the handwriting we already trust Gemini for — and it's a one-time batch, so model cost is a one-time concern.
+
+**Validation gate before any insert.** Each extraction must pass: page-1/page-2 problem counts match, numbering is contiguous `1..N`, every problem has a non-empty answer, and — where the answer is arithmetic — it is **recomputed in code and confirmed**. Pass → insert. Fail or low-confidence → a **quarantine table for parent review**, never auto-trusted (bad parsed data would silently corrupt grading).
+
+**Idempotent + auditable.** Hash each PDF (skip unchanged on re-runs); store the **raw model JSON + page text** beside the `Problem` rows so extractions can be re-derived and audited without re-calling the model. Generated sheets already carry structured, code-validated problems + answers, so they **skip extraction** and enter at the validation gate.
 ## 14. Out of scope (initial build)
 - Dashboard UI (data captured now, built later).
 - Native mobile app.
-- Voice input to the tutor.
+- Real-time spoken tutoring (Gemini Live) and tutor text-to-speech. (Voice *input* via browser speech-to-text **is** in scope for v1; the tutor replies in writing + visuals.)
 - Grade 4 content (folder reserved).
 - Multi-family / accounts beyond this household.
 ## 15. Open questions for planning
 - Exact mastery scoring formula and state-transition thresholds.
 - Recommender weighting (weak-skill priority vs. spaced-review cadence).
 - XP/level curve and campaign goal defaults per grade.
-- PDF parsing robustness across topics (some K5 layouts vary — measurement, geometry); fallback to model parsing when `pdftotext` alignment is ambiguous.
+- Extraction accuracy on the hardest visual layouts (geometry figures, multi-line word problems) and the volume of quarantined sheets needing manual review (see §13).
 - Print pathway from the browser on iPad (direct print vs. download-then-print).
