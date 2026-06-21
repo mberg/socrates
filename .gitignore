@@ -1,0 +1,26 @@
+# Source worksheet PDFs — large, copyrighted, live in R2 not git
+/worksheets/
+/worksheet-g3/
+/worksheets-g4/
+
+# OS
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+*.egg-info/
+
+# Node / Bun / frontend
+node_modules/
+dist/
+.vite/
+bun.lockb
+*.local
+
+# Editor
+.idea/
+.vscode/
