@@ -107,9 +107,9 @@ async def test_run_continues_past_failure(tmp_path):
 @pytest.mark.asyncio
 async def test_run_does_not_call_create_all_when_session_factory_provided(tmp_path):
     """When session_factory is provided, _run must not call create_all (no Postgres touch)."""
+    # tmp_path has no PDFs, so asyncio.gather over an empty list never opens a session.
+    # We only need a non-None callable to satisfy the session_factory is not None guard.
     sqlite_engine = create_async_engine("sqlite+aiosqlite:///:memory:")
-    async with sqlite_engine.begin() as conn:
-        await conn.run_sync(SQLModel.metadata.create_all)
     sqlite_factory = async_sessionmaker(sqlite_engine, class_=AsyncSession, expire_on_commit=False)
 
     with patch("app.cli.create_all", new_callable=AsyncMock) as mock_create_all:
