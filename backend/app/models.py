@@ -53,12 +53,17 @@ class QuarantinedExtraction(SQLModel, table=True):
     raw_json: dict = Field(default_factory=dict, sa_column=Column(SAJSON))
 
 
+def _utcnow() -> datetime:
+    """Return current UTC time as a naive datetime (matches TIMESTAMP WITHOUT TIME ZONE columns)."""
+    return datetime.now(UTC).replace(tzinfo=None)
+
+
 class Child(SQLModel, table=True):
     __tablename__ = "child"
     id: str = Field(default_factory=_id, primary_key=True)
     name: str
     grade: int
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    created_at: datetime = Field(default_factory=_utcnow)
 
 
 class Attempt(SQLModel, table=True):
@@ -71,4 +76,4 @@ class Attempt(SQLModel, table=True):
     printed_at: datetime | None = None
     scanned_at: datetime | None = None
     graded_at: datetime | None = None
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    created_at: datetime = Field(default_factory=_utcnow)

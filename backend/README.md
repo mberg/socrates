@@ -42,6 +42,17 @@ cd backend && DATABASE_URL=postgresql://... uv run alembic upgrade head
 cd backend && uv run python -m app.cli ingest ../worksheets
 ```
 
+## Print + QR
+
+Create a child, create an attempt for a worksheet (generates a QR-stamped,
+answer-key-stripped print PDF stored in R2), and download it to print:
+
+    # with the API running (uv run uvicorn app.main:app), against the live DB + R2:
+    curl -s -X POST localhost:8000/api/children -d '{"name":"Ada","grade":5}' -H 'content-type: application/json'
+    # pick a worksheet id from GET /api/skills?grade=5 -> /skills/{id}/worksheets
+    curl -s -X POST localhost:8000/api/children/CHILD_ID/attempts -d '{"worksheet_id":"WS_ID"}' -H 'content-type: application/json'
+    curl -s localhost:8000/api/attempts/ATTEMPT_ID/print -o attempt.pdf  # 1-page, QR-stamped, no answer key
+
 ## Tests
 
 Run the full test suite:
