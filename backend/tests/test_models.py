@@ -15,6 +15,7 @@ async def session():
     factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     async with factory() as s:
         yield s
+    await engine.dispose()
 
 
 async def test_skill_worksheet_problem_roundtrip(session):
