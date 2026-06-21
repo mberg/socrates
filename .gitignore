@@ -24,3 +24,9 @@ bun.lockb
 # Editor
 .idea/
 .vscode/
+
+# SDD orchestration scratch (local recovery state)
+.superpowers/
+
+# SQLite dev DBs
+*.db
