@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 from dataclasses import dataclass
 
@@ -38,8 +39,11 @@ async def ingest_pdf(path, *, session: AsyncSession, extractor: Extractor, store
         return IngestOutcome("skipped", None, None)
 
     tax = parse_filename(path)
-    pages: PdfPages = loader(path)
-    extraction = extractor.extract(pages)
+    # PDF parsing and the Gemini SDK call are blocking/sync — run them in worker
+    # threads so they don't freeze the event loop (and so concurrent ingests
+    # actually overlap instead of serializing/deadlocking).
+    pages: PdfPages = await asyncio.to_thread(loader, path)
+    extraction = await asyncio.to_thread(extractor.extract, pages)
     result = validate(extraction)
     if not result.ok:
         session.add(QuarantinedExtraction(pdf_path=path, pdf_sha256=sha, reason=result.reason or "invalid",
@@ -50,7 +54,7 @@ async def ingest_pdf(path, *, session: AsyncSession, extractor: Extractor, store
     skill = await _get_or_create_skill(session, tax)
     if skill.label == skill.skill_key and extraction.title:
         skill.label = extraction.title
-    r2_key = store.put(f"worksheets/{sha}.pdf", raw, "application/pdf")
+    r2_key = await asyncio.to_thread(store.put, f"worksheets/{sha}.pdf", raw, "application/pdf")
     ws = Worksheet(skill_id=skill.id, source="k5", variant=tax.variant, title=extraction.title,
                    worked_example=extraction.worked_example, source_pdf_r2_key=r2_key,
                    problem_count=len(extraction.problems), pdf_sha256=sha)
