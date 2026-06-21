@@ -13,8 +13,19 @@ _PROMPT = (
 
 
 class GeminiExtractor:
-    def __init__(self, api_key: str, model: str = "gemini-2.5-flash") -> None:
-        self._client = genai.Client(api_key=api_key)
+    def __init__(
+        self,
+        api_key: str = "",
+        model: str = "gemini-2.5-flash",
+        *,
+        use_vertex: bool = False,
+        project: str | None = None,
+        location: str | None = None,
+    ) -> None:
+        if use_vertex:
+            self._client = genai.Client(vertexai=True, project=project, location=location)
+        else:
+            self._client = genai.Client(api_key=api_key)
         self._model = model
 
     def extract(self, pages: PdfPages) -> Extraction:
