@@ -1,0 +1,25 @@
+# Local Postgres for Socrates ingestion. Data persists in the named volume
+# `socrates_pgdata`. Run the full import into this, then dump -> restore to Railway.
+#   docker compose up -d
+#   DATABASE_URL=postgresql+asyncpg://socrates:socrates@localhost:55432/socrates uv run alembic upgrade head
+services:
+  postgres:
+    image: postgres:16
+    container_name: socrates-postgres
+    environment:
+      POSTGRES_USER: socrates
+      POSTGRES_PASSWORD: socrates
+      POSTGRES_DB: socrates
+    ports:
+      - "55432:5432"
+    volumes:
+      - socrates_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U socrates -d socrates"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+volumes:
+  socrates_pgdata:
