@@ -1,4 +1,5 @@
 from uuid import uuid4
+from datetime import UTC, datetime
 
 from sqlalchemy import Column, UniqueConstraint
 from sqlalchemy import JSON as SAJSON
@@ -50,3 +51,24 @@ class QuarantinedExtraction(SQLModel, table=True):
     pdf_sha256: str = Field(index=True)
     reason: str
     raw_json: dict = Field(default_factory=dict, sa_column=Column(SAJSON))
+
+
+class Child(SQLModel, table=True):
+    __tablename__ = "child"
+    id: str = Field(default_factory=_id, primary_key=True)
+    name: str
+    grade: int
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
+class Attempt(SQLModel, table=True):
+    __tablename__ = "attempt"
+    id: str = Field(default_factory=_id, primary_key=True)
+    child_id: str = Field(foreign_key="child.id", index=True)
+    worksheet_id: str = Field(foreign_key="worksheet.id", index=True)
+    status: str = "printed"  # "printed" | "scanned" | "graded"
+    print_pdf_r2_key: str | None = None
+    printed_at: datetime | None = None
+    scanned_at: datetime | None = None
+    graded_at: datetime | None = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
