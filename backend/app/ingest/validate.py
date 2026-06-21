@@ -24,9 +24,13 @@ def _check_arithmetic(prompt: str, answer: str) -> bool | None:
     a, op, b = _as_int(m.group(1)), m.group(2), _as_int(m.group(3))
     expected = {"+": a + b, "-": a - b, "x": a * b, "×": a * b, "*": a * b}[op]
     try:
-        return _as_int(answer) == expected
+        answer_int = _as_int(answer)
     except ValueError:
-        return False
+        # Answer isn't a plain integer (e.g. "18^2" for exponents, or a worked
+        # distributive expansion) — we can't arithmetic-check it, so skip rather
+        # than treat it as a mismatch.
+        return None
+    return answer_int == expected
 
 
 def validate(extraction: Extraction) -> ValidationResult:

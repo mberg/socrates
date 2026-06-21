@@ -14,6 +14,16 @@ def test_valid_contiguous_passes():
     assert res.ok and res.reason is None
 
 
+def test_non_integer_answer_not_quarantined():
+    # Exponent / distributive-expansion answers aren't plain integers; the
+    # arithmetic check should skip (not fail) them.
+    res = validate(_ex([
+        ExtractedProblem(number=1, prompt="18 × 18", correct_answer="18^2"),
+        ExtractedProblem(number=2, prompt="6 × 562", correct_answer="6 x (500 + 60 + 2)"),
+    ]))
+    assert res.ok and res.reason is None
+
+
 def test_non_contiguous_numbering_quarantined():
     res = validate(_ex([
         ExtractedProblem(number=1, prompt="x", correct_answer="a"),
