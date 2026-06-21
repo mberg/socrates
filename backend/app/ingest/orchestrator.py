@@ -2,6 +2,7 @@ import asyncio
 import hashlib
 from dataclasses import dataclass
 
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -21,13 +22,21 @@ class IngestOutcome:
 
 
 async def _get_or_create_skill(session: AsyncSession, tax) -> Skill:
-    existing = (await session.exec(select(Skill).where(Skill.skill_key == tax.skill_key, Skill.grade == tax.grade))).first()
+    stmt = select(Skill).where(Skill.skill_key == tax.skill_key, Skill.grade == tax.grade)
+    existing = (await session.exec(stmt)).first()
     if existing:
         return existing
     skill = Skill(grade=tax.grade, topic=tax.topic, skill_key=tax.skill_key, label=tax.skill_key)
-    session.add(skill)
-    await session.flush()
-    return skill
+    try:
+        async with session.begin_nested():
+            session.add(skill)
+            await session.flush()
+        return skill
+    except IntegrityError:
+        # A concurrent ingest of a sibling worksheet (same grade+skill) created
+        # the skill first; Postgres serializes the unique-index insert, so by now
+        # it's committed — re-query and reuse it.
+        return (await session.exec(stmt)).first()
 
 
 async def ingest_pdf(path, *, session: AsyncSession, extractor: Extractor, store: ObjectStore,
