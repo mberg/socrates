@@ -39,3 +39,7 @@ class R2ObjectStore:
     def get(self, key: str) -> bytes:
         resp = self._client.get_object(Bucket=self._bucket, Key=key)
         return resp["Body"].read()
+
+
+def default_store() -> ObjectStore:
+    return R2ObjectStore()

@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 
 from app.api.catalog import router as catalog_router
+from app.api.children import router as children_router
 
 
 def create_app() -> FastAPI:
@@ -11,6 +12,7 @@ def create_app() -> FastAPI:
         return {"status": "ok"}
 
     app.include_router(catalog_router)
+    app.include_router(children_router)
     return app
 
 
