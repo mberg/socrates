@@ -14,6 +14,9 @@ from app.ingest.taxonomy import parse_filename
          3, "telling-time", "calendar-months-as-numbers", None, False),
         ("worksheet-g3/telling-time/grade-3-calendar-months-as-numbers-cdf.pdf",
          3, "telling-time", "calendar-months-as-numbers-cdf", None, False),
+        # Underscore filename + letter+digit variant (FIX 3)
+        ("worksheet-g3/word-problems-mixed/grade_3_addition_word_problems_b4.pdf",
+         3, "word-problems-mixed", "addition-word-problems", "b4", True),
     ],
 )
 def test_parse_filename(path, grade, topic, skill_key, variant, regular):

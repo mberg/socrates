@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from pathlib import PurePath
 
 _GRADE_RE = re.compile(r"^grade-(\d+)-(.+)$")
-_VARIANT_RE = re.compile(r"^(.*)-([a-z])$")
+_VARIANT_RE = re.compile(r"^(.*)-([a-z]\d*)$")
 
 
 @dataclass(frozen=True)
@@ -18,7 +18,9 @@ class Taxonomy:
 def parse_filename(pdf_path: str) -> Taxonomy:
     p = PurePath(pdf_path)
     topic = p.parent.name
-    m = _GRADE_RE.match(p.stem)
+    # Normalize underscores to hyphens so grade_3_foo_b4 → grade-3-foo-b4
+    stem = p.stem.replace("_", "-")
+    m = _GRADE_RE.match(stem)
     if not m:
         raise ValueError(f"not a grade-N worksheet: {pdf_path}")
     grade = int(m.group(1))
