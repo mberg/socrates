@@ -131,6 +131,48 @@ answer when available.
 **Hint-load is a mastery signal:** a problem answered right only after heavy
 hinting is *not* mastered. Every help request is recorded (see `GuidanceSession`).
 
+### 7.1 Tutor interaction (how the kid talks to the tutor)
+
+A help session is an **interactive, generated chat thread scoped to one
+problem**, seeded with the grounding above (problem text, correct answer, worked
+example, and a crop of the child's handwriting when a scan is attached). Tier
+state is enforced **server-side** (the answer is not revealed until Tier 3 is
+unlocked). Every turn is logged.
+
+**Input — modality-agnostic (v1: text + voice-to-text).** A "turn" is text
+regardless of how it was produced. v1 supports **typing** and **browser
+speech-to-text** (Web Speech API) so the child can *talk and get written
+responses* — important for the younger child, who types slowly. Future upgrade:
+**Gemini Live** real-time spoken tutoring (child talks, tutor talks back) and
+browser text-to-speech; the modality-agnostic turn model lets these drop in
+without reworking the tutor.
+
+**Output — hybrid rich content (option C).** Each tutor turn is a **structured
+payload**, not raw model HTML:
+
+- a `say` field — **Markdown + KaTeX** prose for explanation and clean math
+  notation;
+- optional **`visual` actions** the model "calls" like tools and parameterizes,
+  rendered by a **trusted, kid-friendly React component library**: number line,
+  fraction bars, place-value blocks, multiplication grid, step-by-step list,
+  KaTeX math. The model **cannot inject arbitrary HTML** — it only selects and
+  parameterizes vetted components, which keeps the kid-facing surface safe,
+  consistent, and on-brand.
+
+For math, **SVG components are preferred over AI-generated images** (precise,
+instant, cheap; image models get spacing/quantities wrong). The tutor can also
+**show a crop of the child's own scanned handwriting** as a grounding visual
+("here's the 54 you wrote") — powerful and generation-free.
+
+**One provider:** the Gemini family powers vision (grading), the tutor chat, and
+later live audio — a single integration, swappable behind the `vision` / `tutor`
+interfaces.
+
+**Safety (kid-facing AI):** the system prompt keeps the tutor on the current
+problem, age-appropriate, and tier-respecting; structured output (no raw HTML)
+removes the injection/rendering risk; tier unlock is server-enforced, not left to
+the model.
+
 ## 8. Mastery + recommendation engine
 
 **Mastery is per child × skill**, an explainable score (no heavy ML), updated
@@ -214,6 +256,10 @@ schema).
 - **GuidanceSession** — a help event: child, worksheet, problem, timestamp,
   entry point (scan / in-app / post-grade), max tier reached, resolved?,
   scan-attached?; immutable.
+- **TutorTurn** — append-only, one row per chat turn in a `GuidanceSession`:
+  role (child / tutor), text, input source (typed / voice), any `visual`
+  components emitted, and the tier active at that turn. Gives full session
+  replay and fine-grained hint-load signal.
 
 **Learning signals & analytics:**
 
@@ -255,7 +301,9 @@ the `Skill` taxonomy.
 
 - Dashboard UI (data captured now, built later).
 - Native mobile app.
-- Voice input to the tutor.
+- Real-time spoken tutoring (Gemini Live) and tutor text-to-speech. (Voice
+  *input* via browser speech-to-text **is** in scope for v1; the tutor replies in
+  writing + visuals.)
 - Grade 4 content (folder reserved).
 - Multi-family / accounts beyond this household.
 
