@@ -23,8 +23,8 @@ def discover_pdfs(root: str) -> list[str]:
     )
 
 
-async def _run(root: str, dry_run: bool, *, extractor=None, store=None, loader=None) -> int:
-    await create_all()
+async def _run(root: str, dry_run: bool, *, extractor=None, store=None, loader=None,
+               session_factory=None, concurrency: int = 8) -> int:
     if extractor is None:
         if settings.gemini_use_vertex:
             extractor = GeminiExtractor(
@@ -37,19 +37,27 @@ async def _run(root: str, dry_run: bool, *, extractor=None, store=None, loader=N
             extractor = GeminiExtractor(settings.gemini_api_key, model=settings.gemini_model)
     if store is None:
         store = InMemoryObjectStore() if dry_run else R2ObjectStore()
-    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-    counts: Counter[str] = Counter()
+    if session_factory is None:
+        await create_all()
+        session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+    sem = asyncio.Semaphore(concurrency)
     ingest_kwargs = {} if loader is None else {"loader": loader}
-    for path in discover_pdfs(root):
-        async with factory() as session:
-            try:
-                outcome = await ingest_pdf(path, session=session, extractor=extractor, store=store,
-                                           **ingest_kwargs)
-                counts[outcome.status] += 1
-                print(f"{outcome.status:11} {path}")
-            except Exception as e:
-                counts["errored"] += 1
-                print(f"errored     {path}: {type(e).__name__}: {e}")
+
+    async def _process(path):
+        async with sem:
+            async with session_factory() as session:
+                try:
+                    outcome = await ingest_pdf(path, session=session, extractor=extractor,
+                                               store=store, **ingest_kwargs)
+                    print(f"{outcome.status:11} {path}")
+                    return outcome.status
+                except Exception as e:
+                    print(f"errored     {path}: {type(e).__name__}: {e}")
+                    return "errored"
+
+    statuses = await asyncio.gather(*[_process(p) for p in discover_pdfs(root)])
+    counts = Counter(statuses)
     print(f"\nSummary: {dict(counts)}")
     return 0
 
@@ -60,9 +68,10 @@ def main(argv: list[str]) -> int:
     ing = sub.add_parser("ingest")
     ing.add_argument("root")
     ing.add_argument("--dry-run", action="store_true")
+    ing.add_argument("--concurrency", type=int, default=8)
     args = parser.parse_args(argv)
     if args.command == "ingest":
-        return asyncio.run(_run(args.root, args.dry_run))
+        return asyncio.run(_run(args.root, args.dry_run, concurrency=args.concurrency))
     return 1
 
 

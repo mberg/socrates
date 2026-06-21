@@ -1,6 +1,11 @@
+import hashlib
 from pathlib import Path
+from unittest.mock import AsyncMock, patch
 
 import pytest
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+from sqlmodel import SQLModel
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.cli import discover_pdfs, _run
 from app.ingest.extractor import Extraction, ExtractedProblem
@@ -75,16 +80,44 @@ async def test_run_continues_past_failure(tmp_path):
 
     store = InMemoryObjectStore()
 
+    # Build an isolated SQLite in-memory engine so _run never touches Postgres
+    sqlite_engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    async with sqlite_engine.begin() as conn:
+        await conn.run_sync(SQLModel.metadata.create_all)
+    sqlite_factory = async_sessionmaker(sqlite_engine, class_=AsyncSession, expire_on_commit=False)
+
     result = await _run(
         str(tmp_path),
         dry_run=True,
         extractor=_FakeExtractor(result=_GOOD_EXTRACTION),
         store=store,
         loader=_SelectiveLoader(fail_for=fail_name),
+        session_factory=sqlite_factory,
     )
 
     assert result == 0
-    # The ok file was processed (inserted or skipped if already present) and the error file
-    # was caught without aborting the loop.  The errored file must NOT appear in the store.
-    errored_key = f"worksheets/{__import__('hashlib').sha256(b'%PDF-1.4 bad').hexdigest()}.pdf"
+    # The errored file must NOT appear in the store.
+    errored_key = f"worksheets/{hashlib.sha256(b'%PDF-1.4 bad').hexdigest()}.pdf"
     assert errored_key not in store.objects
+    # The good file WAS processed and its PDF bytes are stored.
+    good_key = f"worksheets/{hashlib.sha256(b'%PDF-1.4 ok').hexdigest()}.pdf"
+    assert good_key in store.objects
+
+
+@pytest.mark.asyncio
+async def test_run_does_not_call_create_all_when_session_factory_provided(tmp_path):
+    """When session_factory is provided, _run must not call create_all (no Postgres touch)."""
+    sqlite_engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    async with sqlite_engine.begin() as conn:
+        await conn.run_sync(SQLModel.metadata.create_all)
+    sqlite_factory = async_sessionmaker(sqlite_engine, class_=AsyncSession, expire_on_commit=False)
+
+    with patch("app.cli.create_all", new_callable=AsyncMock) as mock_create_all:
+        result = await _run(
+            str(tmp_path),
+            dry_run=True,
+            session_factory=sqlite_factory,
+        )
+
+    mock_create_all.assert_not_called()
+    assert result == 0
