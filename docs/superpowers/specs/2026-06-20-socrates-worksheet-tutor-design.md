@@ -1,4 +1,12 @@
+---
+version: 0.2.0
+last_modified: 2026-06-21T03:37:00.000Z
+---
 # Socrates — Worksheet Tutor & Progress System
+<sub>`v0.2.0 · Last modified Jun 20, 2026 at 11:37 PM EDT`</sub>
+
+{>>Process note (claude): reconciled your web edits with my unpushed local changes — merged and took your edited version as the base. Heads-up: the tutor-interaction detail we agreed in chat (hybrid component output, voice-to-text input, and a TutorTurn record) is NOT in this version yet — I deferred it to the next rewrite pass so this review stays replies-only. Version stamping starts here.<<}{id="c2" by="claude" at="2026-06-21T03:37:00.000Z"}
+
 **Design doc** · 2026-06-20
 ## 1. Purpose
 A web app for a parent to run a summer math program for two children (a 5th grader and a 3rd grader). The system recommends worksheets, prints them, grades the child's handwritten work from a photo, gives tiered Socratic guidance on mistakes, tracks per-skill mastery, and motivates the kids with points, levels, and a summer-long campaign. New worksheets can be generated on demand in the style of the source library.
@@ -58,7 +66,7 @@ Every printed sheet carries a **QR code** encoding the `Attempt` id. This is the
 3. Each read is aligned to a `Problem` (via QR-known layout) and compared to the stored correct answer.
 4. `ProblemResult` per problem: what Gemini read, correct?, and **confidence**. **Low-confidence reads are flagged for the parent to review** rather than silently trusted.
 5. Score + results stream to the UI; mastery and XP update.
-## {==7. Guidance / tutoring (the "Socrates" core)==}{>>I want to also be able to select a section too. So it can be driven a bit by the student or parent on what to work with.  we'll start from the beginning and advance based on how the child is doing though.<<}{id="c1" by="mberg" at="2026-06-21T03:29:29.152Z"}
+## {==7. Guidance / tutoring (the "Socrates" core)==}{>>I want to also be able to select a section too. So it can be driven a bit by the student or parent on what to work with.  we'll start from the beginning and advance based on how the child is doing though.<<}{id="c1" by="mberg" at="2026-06-21T03:29:29.152Z"} {>>Reply (claude): Agreed — we'll layer student/parent choice on top of the recommender. Default stays as you describe: start at the beginning of the grade's sequence and auto-advance based on performance; a manual pick just steers focus. Two things so I build §8 right: (1) What grain is a "section" — a topic area (e.g. Fractions), a single skill, or an ordered curriculum sequence to walk through? (2) Should a manual pick temporarily override the recommender ("work on this right now"), or set a persistent focus the recommender then prioritizes within? Tell me and I'll fold it into §8 on the next rewrite pass.<<}{id="c3" by="claude" at="2026-06-21T03:37:00.000Z" re="c1"}
 Tiered, chat-style tutor that **never reveals the answer until Tier 3**:
 
 1. **Tier 1 – Nudge:** a guiding question, no numbers given away.
