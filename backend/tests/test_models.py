@@ -33,3 +33,17 @@ async def test_skill_worksheet_problem_roundtrip(session):
     assert len(rows) == 1
     assert rows[0].correct_answer == "30,104"
     assert len(skill.id) == 32  # uuid4().hex
+
+
+async def test_same_skill_key_different_grade_coexist(session):
+    """Two Skills with identical skill_key but different grade must both persist."""
+    s3 = Skill(grade=3, skill_key="equivalent-fractions", topic="fractions", label="Equivalent Fractions G3")
+    s5 = Skill(grade=5, skill_key="equivalent-fractions", topic="fractions", label="Equivalent Fractions G5")
+    session.add(s3)
+    session.add(s5)
+    await session.commit()
+
+    rows = (await session.exec(select(Skill).where(Skill.skill_key == "equivalent-fractions"))).all()
+    assert len(rows) == 2
+    grades = {r.grade for r in rows}
+    assert grades == {3, 5}

@@ -20,7 +20,7 @@ class IngestOutcome:
 
 
 async def _get_or_create_skill(session: AsyncSession, tax) -> Skill:
-    existing = (await session.exec(select(Skill).where(Skill.skill_key == tax.skill_key))).first()
+    existing = (await session.exec(select(Skill).where(Skill.skill_key == tax.skill_key, Skill.grade == tax.grade))).first()
     if existing:
         return existing
     skill = Skill(grade=tax.grade, topic=tax.topic, skill_key=tax.skill_key, label=tax.skill_key)

@@ -11,7 +11,7 @@ def _id() -> str:
 
 class Skill(SQLModel, table=True):
     __tablename__ = "skill"
-    __table_args__ = (UniqueConstraint("skill_key"),)
+    __table_args__ = (UniqueConstraint("grade", "skill_key"),)
     id: str = Field(default_factory=_id, primary_key=True)
     grade: int
     topic: str

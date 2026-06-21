@@ -38,7 +38,7 @@ def upgrade() -> None:
     sa.Column('skill_key', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
     sa.Column('label', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
     sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('skill_key')
+    sa.UniqueConstraint('grade', 'skill_key')
     )
     op.create_index(op.f('ix_skill_skill_key'), 'skill', ['skill_key'], unique=False)
     op.create_table('worksheet',
