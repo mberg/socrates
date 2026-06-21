@@ -65,4 +65,5 @@ async def test_invalid_extraction_quarantined(session, tmp_path):
     assert out.status == "quarantined"
     q = (await session.exec(select(QuarantinedExtraction))).all()
     assert "arithmetic" in q[0].reason
+    assert q[0].raw_json["title"] == "t"
     assert len((await session.exec(select(Worksheet))).all()) == 0

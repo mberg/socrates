@@ -31,7 +31,8 @@ async def _get_or_create_skill(session: AsyncSession, tax) -> Skill:
 
 async def ingest_pdf(path, *, session: AsyncSession, extractor: Extractor, store: ObjectStore,
                      loader=load_pdf) -> IngestOutcome:
-    raw = open(path, "rb").read()
+    with open(path, "rb") as fh:
+        raw = fh.read()
     sha = hashlib.sha256(raw).hexdigest()
     if (await session.exec(select(Worksheet).where(Worksheet.pdf_sha256 == sha))).first():
         return IngestOutcome("skipped", None, None)
