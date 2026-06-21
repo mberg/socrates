@@ -1,3 +1,5 @@
+import asyncio
+
 from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel
 from sqlmodel import select
@@ -62,6 +64,5 @@ async def download_print(attempt_id: str, session: AsyncSession = Depends(get_se
     attempt = (await session.exec(select(Attempt).where(Attempt.id == attempt_id))).first()
     if attempt is None or attempt.print_pdf_r2_key is None:
         raise HTTPException(status_code=404, detail="attempt or print not found")
-    import asyncio
     pdf = await asyncio.to_thread(store.get, attempt.print_pdf_r2_key)
     return Response(content=pdf, media_type="application/pdf")
