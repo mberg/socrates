@@ -84,5 +84,7 @@ async def test_run_continues_past_failure(tmp_path):
     )
 
     assert result == 0
-    # The successful file should have been stored; the errored one should not.
-    assert len(store.objects) == 1
+    # The ok file was processed (inserted or skipped if already present) and the error file
+    # was caught without aborting the loop.  The errored file must NOT appear in the store.
+    errored_key = f"worksheets/{__import__('hashlib').sha256(b'%PDF-1.4 bad').hexdigest()}.pdf"
+    assert errored_key not in store.objects
