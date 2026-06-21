@@ -26,7 +26,15 @@ def discover_pdfs(root: str) -> list[str]:
 async def _run(root: str, dry_run: bool, *, extractor=None, store=None, loader=None) -> int:
     await create_all()
     if extractor is None:
-        extractor = GeminiExtractor(settings.gemini_api_key)
+        if settings.gemini_use_vertex:
+            extractor = GeminiExtractor(
+                use_vertex=True,
+                project=settings.gemini_vertex_project,
+                location=settings.gemini_vertex_location,
+                model=settings.gemini_model,
+            )
+        else:
+            extractor = GeminiExtractor(settings.gemini_api_key, model=settings.gemini_model)
     if store is None:
         store = InMemoryObjectStore() if dry_run else R2ObjectStore()
     factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
