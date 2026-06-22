@@ -19,6 +19,9 @@ def build_print_pdf(source_pdf: bytes, qr_payload: str, caption: str = "") -> by
         page.insert_image(rect, stream=qr_png)
         if caption:
             page.insert_text((rect.x0, rect.y1 + 9), caption, fontsize=6)
+        # Human-readable Attempt id under the QR: a vision model OCRs this off the
+        # photo to cross-check identity — no server-side QR-decode dependency needed.
+        page.insert_text((rect.x0, rect.y1 + 18), qr_payload, fontsize=7, fontname="cour")
         result = out.tobytes()
         out.close()
         return result

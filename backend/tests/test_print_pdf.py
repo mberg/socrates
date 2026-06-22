@@ -25,3 +25,10 @@ def test_build_print_pdf_stamps_an_image():
     out = build_print_pdf(_two_page_pdf(), "attempt-xyz")
     doc = fitz.open(stream=out, filetype="pdf")
     assert len(doc[0].get_images()) >= 1  # the QR image is present
+
+
+def test_build_print_pdf_stamps_human_readable_id():
+    from app.printing.print_pdf import build_print_pdf
+    out = build_print_pdf(_two_page_pdf(), "abc123def456")
+    doc = fitz.open(stream=out, filetype="pdf")
+    assert "abc123def456" in doc[0].get_text()  # readable id for OCR cross-check
