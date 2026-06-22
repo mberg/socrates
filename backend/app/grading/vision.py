@@ -47,8 +47,9 @@ _READ_PROMPT = (
     "You are given a photo of a child's completed math worksheet plus the list of "
     "its numbered problems. For EVERY problem number, return what the child wrote as "
     "the answer (read_answer), or null if blank/unreadable, with a confidence in "
-    "[0,1]. Also return printed_id: the short code printed under the QR at the top "
-    "(or null if you can't read it). Do not grade — only transcribe."
+    "[0,1]. Also return printed_id: the short 5-character code (letters and digits) "
+    "printed in large monospace under the QR at the top (or null if you can't read "
+    "it). Do not grade — only transcribe."
 )
 
 _EQUIV_PROMPT = (

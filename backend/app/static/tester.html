@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Socrates grading tester</title>
+<style>
+  :root { --ok:#16794a; --bad:#b3261e; --flag:#a15c00; --line:#d9d9e3; --bg:#f7f7fb; }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, system-ui, "Segoe UI", Roboto, sans-serif; margin: 0;
+         background: var(--bg); color: #1a1a22; line-height: 1.4; }
+  header { background: #2a2a3c; color: #fff; padding: 14px 16px; font-size: 18px; font-weight: 600; }
+  header small { display:block; font-weight: 400; opacity: .7; font-size: 12px; margin-top: 2px; }
+  main { max-width: 680px; margin: 0 auto; padding: 16px; }
+  .card { background:#fff; border:1px solid var(--line); border-radius:12px; padding:14px; margin:0 0 14px; }
+  .card h2 { margin:0 0 10px; font-size:14px; text-transform:uppercase; letter-spacing:.04em; color:#555; }
+  .step { font-size:11px; color:#888; }
+  label { display:block; font-size:13px; margin:8px 0 4px; color:#444; }
+  select, input, button { font-size:16px; padding:10px; border-radius:8px; border:1px solid var(--line);
+                          width:100%; background:#fff; }
+  button { background:#3a3a52; color:#fff; border:0; font-weight:600; margin-top:10px; cursor:pointer; }
+  button.secondary { background:#ececf3; color:#2a2a3c; }
+  button:disabled { opacity:.45; cursor:not-allowed; }
+  .row { display:flex; gap:8px; } .row > * { flex:1; }
+  .pill { display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; font-weight:600; }
+  .muted { color:#888; font-size:13px; }
+  .sel { font-size:13px; margin-top:8px; }
+  .sel b { color:#2a2a3c; }
+  table { width:100%; border-collapse:collapse; margin-top:8px; font-size:14px; }
+  th, td { text-align:left; padding:8px 6px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { font-size:11px; text-transform:uppercase; color:#888; }
+  .ok { color:var(--ok); } .bad { color:var(--bad); } .flag { color:var(--flag); }
+  .score { font-size:28px; font-weight:700; }
+  .err { color:var(--bad); font-size:13px; margin-top:8px; white-space:pre-wrap; }
+  a.btnlink { display:block; text-align:center; text-decoration:none; background:#ececf3;
+              color:#2a2a3c; padding:10px; border-radius:8px; font-weight:600; margin-top:10px; }
+</style>
+</head>
+<body>
+<header>Socrates — grading tester <small>print → snap a photo → grade. Throwaway harness, not the real UI.</small></header>
+<main>
+
+  <div class="card">
+    <h2>1 · Child</h2>
+    <label for="childSel">Pick a child</label>
+    <select id="childSel"><option value="">— loading… —</option></select>
+    <div class="row">
+      <input id="newChildName" placeholder="New child name">
+      <input id="newChildGrade" type="number" placeholder="Grade" min="1" max="8" style="max-width:110px">
+    </div>
+    <button class="secondary" id="addChild">Add child</button>
+  </div>
+
+  <div class="card">
+    <h2>2 · Worksheet</h2>
+    <label for="gradeSel">Grade</label>
+    <select id="gradeSel">
+      <option value="">All</option><option>3</option><option>4</option><option>5</option>
+    </select>
+    <label for="skillSel">Skill</label>
+    <select id="skillSel"><option value="">— pick a grade —</option></select>
+    <label for="wsSel">Worksheet</label>
+    <select id="wsSel"><option value="">— pick a skill —</option></select>
+    <div class="sel" id="wsSelLabel"></div>
+  </div>
+
+  <div class="card">
+    <h2>3 · Print</h2>
+    <p class="muted">Creates an attempt (status <code>printed</code>) and a QR-stamped print PDF. Open it, print it, let the kid solve it.</p>
+    <button id="makeAttempt" disabled>Create attempt &amp; get print PDF</button>
+    <div class="sel" id="attemptInfo"></div>
+    <a class="btnlink" id="printLink" style="display:none" target="_blank" rel="noopener">Open print PDF ↗</a>
+  </div>
+
+  <div class="card">
+    <h2>4 · Snap &amp; grade</h2>
+    <p class="muted">Grading runs against the attempt below. Take a photo of the whole completed sheet.</p>
+    <label for="attemptId">Attempt id</label>
+    <input id="attemptId" placeholder="auto-filled after step 3, or paste one">
+    <label for="photo">Photo of the completed sheet</label>
+    <input id="photo" type="file" accept="image/*" capture="environment">
+    <label style="display:flex; align-items:center; gap:8px; margin-top:10px;">
+      <input type="checkbox" id="aiFallback" style="width:auto;">
+      Use AI equivalence check (slower; for harder/messier sections)
+    </label>
+    <button id="grade" disabled>Upload &amp; grade</button>
+    <button class="secondary" id="refresh">Refresh latest results</button>
+    <div class="err" id="gradeErr"></div>
+  </div>
+
+  <div class="card" id="resultsCard" style="display:none">
+    <h2>Results</h2>
+    <div id="resultsBody"></div>
+  </div>
+
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const state = { childId: "", worksheetId: "", attemptId: "" };
+
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  const text = await r.text();
+  let body; try { body = text ? JSON.parse(text) : null; } catch { body = text; }
+  if (!r.ok) throw new Error(`${r.status} ${r.statusText}: ${typeof body === "string" ? body : JSON.stringify(body)}`);
+  return body;
+}
+
+function opt(value, label) { const o = document.createElement("option"); o.value = value; o.textContent = label; return o; }
+
+async function loadChildren() {
+  const sel = $("childSel"); sel.innerHTML = "";
+  sel.appendChild(opt("", "— select —"));
+  try {
+    const kids = await api("/api/children");
+    kids.forEach(k => sel.appendChild(opt(k.id, `${k.name} (grade ${k.grade})`)));
+  } catch (e) { sel.appendChild(opt("", "error loading")); }
+}
+
+$("addChild").onclick = async () => {
+  const name = $("newChildName").value.trim();
+  const grade = parseInt($("newChildGrade").value, 10);
+  if (!name || !grade) return alert("Name and grade required");
+  const k = await api("/api/children", { method: "POST", headers: {"content-type":"application/json"},
+    body: JSON.stringify({ name, grade }) });
+  $("newChildName").value = ""; $("newChildGrade").value = "";
+  await loadChildren(); $("childSel").value = k.id; state.childId = k.id; refreshReady();
+};
+
+$("childSel").onchange = (e) => { state.childId = e.target.value; refreshReady(); };
+
+async function loadSkills() {
+  const grade = $("gradeSel").value;
+  const sel = $("skillSel"); sel.innerHTML = ""; sel.appendChild(opt("", "— select skill —"));
+  $("wsSel").innerHTML = ""; $("wsSel").appendChild(opt("", "— pick a skill —"));
+  const q = grade ? `?grade=${grade}` : "";
+  const skills = await api(`/api/skills${q}`);
+  skills.sort((a,b) => (a.label||a.skill_key).localeCompare(b.label||b.skill_key));
+  skills.forEach(s => sel.appendChild(opt(s.id, `${s.label || s.skill_key} · g${s.grade}`)));
+}
+$("gradeSel").onchange = loadSkills;
+
+$("skillSel").onchange = async (e) => {
+  const sel = $("wsSel"); sel.innerHTML = ""; sel.appendChild(opt("", "— select worksheet —"));
+  if (!e.target.value) return;
+  const wss = await api(`/api/skills/${e.target.value}/worksheets`);
+  wss.forEach(w => sel.appendChild(opt(w.id, `${w.title}${w.variant ? " ("+w.variant+")" : ""} · ${w.problem_count}q`)));
+};
+
+$("wsSel").onchange = (e) => {
+  state.worksheetId = e.target.value;
+  $("wsSelLabel").innerHTML = e.target.value ? `Selected: <b>${e.target.selectedOptions[0].textContent}</b>` : "";
+  refreshReady();
+};
+
+function refreshReady() {
+  $("makeAttempt").disabled = !(state.childId && state.worksheetId);
+  $("grade").disabled = !($("attemptId").value.trim() && $("photo").files.length);
+}
+
+$("makeAttempt").onclick = async () => {
+  $("makeAttempt").disabled = true;
+  try {
+    const a = await api(`/api/children/${state.childId}/attempts`, {
+      method: "POST", headers: {"content-type":"application/json"},
+      body: JSON.stringify({ worksheet_id: state.worksheetId }) });
+    state.attemptId = a.id;
+    $("attemptId").value = a.id;
+    $("attemptInfo").innerHTML = `Attempt <b>${a.id}</b> · status <span class="pill" style="background:#ececf3">${a.status}</span>`;
+    const link = $("printLink");
+    link.href = `/api/attempts/${a.id}/print`; link.style.display = "block";
+  } catch (e) { $("attemptInfo").innerHTML = `<span class="err">${e.message}</span>`; }
+  refreshReady();
+};
+
+$("attemptId").oninput = () => refreshReady();
+$("photo").onchange = () => refreshReady();
+
+$("grade").onclick = async () => {
+  const attemptId = $("attemptId").value.trim();
+  const file = $("photo").files[0];
+  if (!attemptId || !file) return;
+  $("grade").disabled = true; $("gradeErr").textContent = "";
+  $("grade").textContent = "Grading…";
+  try {
+    const childId = state.childId || (await firstChildId());
+    const fd = new FormData(); fd.append("file", file);
+    fd.append("ai_fallback", $("aiFallback").checked ? "true" : "false");
+    const res = await api(`/api/children/${childId}/attempts/${attemptId}/submissions`,
+      { method: "POST", body: fd });
+    renderResults(res);
+  } catch (e) {
+    $("gradeErr").textContent = e.message;
+  } finally { $("grade").textContent = "Upload & grade"; refreshReady(); }
+};
+
+$("refresh").onclick = async () => {
+  const attemptId = $("attemptId").value.trim();
+  if (!attemptId) return;
+  $("gradeErr").textContent = "";
+  try { renderResults(await api(`/api/attempts/${attemptId}/results`)); }
+  catch (e) { $("gradeErr").textContent = e.message; }
+};
+
+async function firstChildId() {
+  const kids = await api("/api/children");
+  if (!kids.length) throw new Error("no children — create one in step 1");
+  return kids[0].id;
+}
+
+function renderResults(res) {
+  const card = $("resultsCard"); card.style.display = "block";
+  const rows = res.results.map(r => `
+    <tr>
+      <td>${r.number}</td>
+      <td>${r.read_answer === null ? '<span class="muted">(blank)</span>' : escapeHtml(r.read_answer)}</td>
+      <td class="${r.is_correct ? 'ok':'bad'}">${r.is_correct ? '✓' : '✗'}</td>
+      <td class="muted">${(r.confidence*100|0)}% · ${r.match_method}${r.needs_review ? ' <span class="flag">⚑ review</span>' : ''}</td>
+    </tr>`).join("");
+  const idWarn = (res.identity_ok === false)
+    ? `<div class="err">⚠ the code read off the photo didn't match this attempt — graded anyway (check it's the right sheet)</div>` : "";
+  $("resultsBody").innerHTML = `
+    <div class="score">${res.score_correct}/${res.score_total}</div>
+    <div class="muted">submission ${res.submission_id} · ${res.needs_review_count} flagged for review</div>
+    ${idWarn}
+    <table><thead><tr><th>#</th><th>Read</th><th>OK</th><th>Confidence · method</th></tr></thead>
+    <tbody>${rows}</tbody></table>`;
+}
+
+function escapeHtml(s) { return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+loadChildren();
+</script>
+</body>
+</html>

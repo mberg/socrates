@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.grading.compare import answers_match
+from app.grading.compare import answers_match, parses_as_number
 from app.grading.vision import ProblemPrompt, Vision
 from app.models import Attempt, Problem, ProblemResult, Submission, _id, _utcnow
 from app.storage import ObjectStore
@@ -13,8 +13,8 @@ LOW_CONFIDENCE_THRESHOLD = 0.7
 _MIME_BY_EXT = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png"}
 
 
-class IdentityMismatch(Exception):
-    pass
+def _norm_code(s: str) -> str:
+    return "".join(c for c in s.upper() if c.isalnum())
 
 
 class ProblemResultOut(BaseModel):
@@ -33,11 +33,13 @@ class GradeResult(BaseModel):
     score_correct: int
     score_total: int
     needs_review_count: int
+    identity_ok: bool = True  # did the code read off the photo match the attempt's code?
     results: list[ProblemResultOut]
 
 
 async def grade_submission(*, session: AsyncSession, store: ObjectStore, vision: Vision,
-                           attempt: Attempt, photo: bytes, ext: str) -> GradeResult:
+                           attempt: Attempt, photo: bytes, ext: str,
+                           ai_fallback: bool = False) -> GradeResult:
     submission_id = _id()
     key = f"submissions/{submission_id}.{ext}"
     content_type = _MIME_BY_EXT.get(ext.lower(), "application/octet-stream")
@@ -57,8 +59,11 @@ async def grade_submission(*, session: AsyncSession, store: ObjectStore, vision:
         vision.read, photo, [ProblemPrompt(number=p.number, prompt=p.prompt) for p in problems]
     )
 
-    if read.printed_id is not None and read.printed_id.strip().lower() != attempt.id:
-        raise IdentityMismatch(f"photo printed_id {read.printed_id!r} != attempt {attempt.id}")
+    # Advisory identity cross-check: the API already resolved the authoritative
+    # attempt, so a misread/missing code never blocks grading — it just flags.
+    identity_ok = True
+    if read.printed_id and attempt.code:
+        identity_ok = _norm_code(read.printed_id) == _norm_code(attempt.code)
 
     reads = {r.number: r for r in read.problems}
     outs: list[ProblemResultOut] = []
@@ -71,8 +76,16 @@ async def grade_submission(*, session: AsyncSession, store: ObjectStore, vision:
             is_correct = True
             method = "exact" if (read_answer or "").strip() == p.correct_answer.strip() else "normalized"
         elif read_answer is not None:
-            is_correct = await asyncio.to_thread(vision.judge_equivalence, read_answer, p.correct_answer)
-            method = "gemini_equiv"
+            # Mismatch on a non-blank read. Trust the code for a clear numeric
+            # difference; only consult Gemini when the code can't parse a side
+            # (a format it doesn't understand) — unless ai_fallback forces it on.
+            code_decisive = parses_as_number(read_answer) and parses_as_number(p.correct_answer)
+            if ai_fallback or not code_decisive:
+                is_correct = await asyncio.to_thread(vision.judge_equivalence, read_answer, p.correct_answer)
+                method = "gemini_equiv"
+            else:
+                is_correct = False
+                method = "normalized"
         else:
             is_correct = False
             method = "exact"
@@ -93,5 +106,6 @@ async def grade_submission(*, session: AsyncSession, store: ObjectStore, vision:
     return GradeResult(
         submission_id=submission_id, attempt_id=attempt.id,
         score_correct=sum(1 for o in outs if o.is_correct), score_total=len(outs),
-        needs_review_count=sum(1 for o in outs if o.needs_review), results=outs,
+        needs_review_count=sum(1 for o in outs if o.needs_review),
+        identity_ok=identity_ok, results=outs,
     )

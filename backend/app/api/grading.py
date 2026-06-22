@@ -1,11 +1,11 @@
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.api.children import get_store
 from app.config import settings
 from app.db import get_session
-from app.grading.service import GradeResult, IdentityMismatch, ProblemResultOut, grade_submission
+from app.grading.service import GradeResult, ProblemResultOut, grade_submission
 from app.grading.vision import GeminiVision, Vision
 from app.models import Attempt, Problem, ProblemResult, Submission
 from app.storage import ObjectStore
@@ -26,6 +26,7 @@ def get_vision() -> Vision:
 async def create_submission(
     child_id: str, attempt_id: str,
     file: UploadFile = File(...),
+    ai_fallback: bool = Form(False),
     session: AsyncSession = Depends(get_session),
     store: ObjectStore = Depends(get_store),
     vision: Vision = Depends(get_vision),
@@ -37,11 +38,8 @@ async def create_submission(
         raise HTTPException(status_code=404, detail="attempt not found")
     photo = await file.read()
     ext = (file.filename or "photo.jpg").rsplit(".", 1)[-1].lower()
-    try:
-        return await grade_submission(session=session, store=store, vision=vision,
-                                      attempt=attempt, photo=photo, ext=ext)
-    except IdentityMismatch:
-        raise HTTPException(status_code=409, detail="photo does not match this attempt")
+    return await grade_submission(session=session, store=store, vision=vision,
+                                  attempt=attempt, photo=photo, ext=ext, ai_fallback=ai_fallback)
 
 
 @router.get("/attempts/{attempt_id}/results")

@@ -1,3 +1,4 @@
+import secrets
 from uuid import uuid4
 from datetime import UTC, datetime
 
@@ -8,6 +9,15 @@ from sqlmodel import Field, SQLModel
 
 def _id() -> str:
     return uuid4().hex
+
+
+# Base36 minus look-alikes (0/O, 1/I/L) so the printed code is unambiguous to
+# both a person and the vision model reading it off a photo. 31 chars ^ 5 ≈ 28.6M.
+_CODE_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"
+
+
+def _code() -> str:
+    return "".join(secrets.choice(_CODE_ALPHABET) for _ in range(5))
 
 
 class Skill(SQLModel, table=True):
@@ -69,6 +79,9 @@ class Child(SQLModel, table=True):
 class Attempt(SQLModel, table=True):
     __tablename__ = "attempt"
     id: str = Field(default_factory=_id, primary_key=True)
+    # Short, unambiguous human/OCR-readable code stamped on the print + used as the
+    # QR payload. Nullable so attempts created before this column exists still load.
+    code: str | None = Field(default_factory=_code, index=True, unique=True)
     child_id: str = Field(foreign_key="child.id", index=True)
     worksheet_id: str = Field(foreign_key="worksheet.id", index=True)
     status: str = "printed"  # "printed" | "scanned" | "graded"

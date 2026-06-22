@@ -38,3 +38,17 @@ def answers_match(read: str | None, correct: str) -> bool:
     if rf is not None and cf is not None:
         return rf == cf
     return False
+
+
+def parses_as_number(s: str | None) -> bool:
+    """True when s normalizes to a number/fraction the code can compare on its own.
+
+    When both the read and the correct answer parse as numbers, a normalized
+    mismatch is a real value difference the code can decide without a model call.
+    When one side doesn't parse (e.g. "5 R 2", a worded answer), the code can't be
+    sure a mismatch isn't just a format it doesn't understand — that's when the
+    Gemini equivalence fallback earns its keep.
+    """
+    if s is None or not s.strip():
+        return False
+    return _as_fraction(_normalize(s)) is not None
