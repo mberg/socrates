@@ -1,8 +1,10 @@
 ---
-version: 0.1.0
-last_modified: 2026-06-22
+version: 0.2.0
+last_modified: 2026-06-22T20:15:08.000Z
 ---
 # Frontend v1 — Print → Grade → Record (design)
+<sub>`v0.2.0 · Last modified Jun 22, 2026 at 4:15 PM EDT`</sub>
+
 **Design doc** · 2026-06-22
 ## 1. Purpose & scope
 A real, iPad-usable web app for the core loop the backend already supports end to end: **print a worksheet, scan the completed sheet, grade it, and record the score.** This replaces the throwaway `/` test harness with a proper interface a parent and kids can actually use day to day.
@@ -14,7 +16,7 @@ Helping a child when they get stuck (the Socratic tutor) is the **explicit next 
 - Pick-a-profile home (kids as avatar tiles), with an optional per-kid PIN.
 - Browse the catalog (topic → skill → worksheet) and print a sheet (QR/code, page-1 only).
 - Scan a completed sheet with the iPad camera and grade it (synchronous).
-- A recorded score history per kid, with a per-problem results detail that never reveals the answer key.
+- A recorded score history per kid, with a per-problem results detail that reveals the correct answer **only** on questions the child attempted and got wrong — never on blanks.
 
 **Out of scope (later plans, backends not built):** the Socratic tutor / "Get help", mastery scoring, XP / badges / streaks, the recommender / "print next" queue, and the parent analytics dashboard.
 ## 2. Users, device, access
@@ -52,18 +54,20 @@ A simple tabbed/sectioned space scoped to one child, defaulting to their grade:
 
 - History of the child's **graded** attempts: worksheet title, score (e.g. `7/20`), date. Tap → results detail.
 ### 4.3 Results detail (privacy rules)
-The kid is never shown the answer key. Per problem, render by state (all derivable from the existing results payload — it returns the read answer, `is_correct`, `confidence`, `needs_review`, but **not** the correct answer):
+The answer key is revealed **only** on questions the child attempted and got wrong — never on blanks. Per problem, render by state:
 
-- **Correct** (`is_correct=true`): ✓, celebrate.
-- {==**Wrong & attempted** (`is_correct=false`, `read_answer` non-null): ✗ with **what the child wrote**, and **no correct answer**. This is where "Get help" will attach next phase.==}{>>For now let's show the correct answer if they got it wrong.  Let's not show answers on not attempted.<<}{id="c1" by="mberg" at="2026-06-22T20:12:28.988Z"}
-- **Not attempted** (`read_answer` is null): shown as **"not attempted"** (not "wrong"), **no answer revealed**.
+- **Correct** (`is_correct=true`): ✓, celebrate. (No need to restate the answer — they got it.)
+- **Wrong & attempted** (`is_correct=false`, `read_answer` non-null): ✗ with **what the child wrote** *and* **the correct answer**, so they can see the right result and self-correct. This is also where "Get help" will attach next phase.
+- **Not attempted** (`read_answer` is null): shown as **"not attempted"** (not "wrong"), and **no answer revealed** — leaving questions blank must never surface the key.
 - **Low-confidence read** (`needs_review=true`): a ⚐ "check this" marker.
 - Header shows the recorded score and date.
+
+{>>Applied c1: wrong-and-attempted now shows the correct answer; blanks still reveal nothing. This needs a backend change — the results payload must include the correct answer ONLY for attempted-wrong problems (see §5 item 4) — so the kid frontend cannot show a blank's answer even if asked. — claude<<}{id="c2" by="claude" at="2026-06-22T20:15:08.000Z" re="c1"}
 ## 5. Backend additions (small)
 1. `Child.pin` — nullable string (store a hash, not plaintext), plus a verify path. Add `pin` (optional) to child create/update; a `POST /api/children/{id}/verify-pin` or equivalent returns ok/!ok. The PIN is a soft kid-profile guard, not real auth.
 2. **Per-child graded-history summary** — `GET /api/children/{id}/scores` returning each graded attempt with `{attempt_id, worksheet_title, score_correct, score_total, graded_at}` so **My scores** is one call instead of N. (Detail still uses `GET /api/attempts/{id}/results`.)
 3. **Serve the built frontend** from FastAPI as a static mount at `/`, keeping `/api` and `/health` unchanged; move the current test harness to `/dev`.
-4. No change needed to the answer-key privacy posture: the print PDF already strips page 2, and the results endpoint already omits correct answers.
+4. **Conditionally expose the correct answer** in the results payload (`GET /api/attempts/{id}/results` and the grade response): add `correct_answer` to each per-problem row, populated **only** when the problem was attempted and wrong (`read_answer` non-null **and** `is_correct=false`); `null` for correct and for not-attempted problems. This enforces the §4.3 rule server-side — a blank's answer is never sent to the client, so the UI can't reveal it. The print PDF still strips page 2 (unchanged).
 ## 6. Error / edge handling
 - **No children yet:** home shows only "Add kid".
 - **Grading failure (vision/network):** the attempt stays un-graded; show a retry; a new photo is just a new submission. "My scores" only lists attempts that actually graded (latest graded submission wins — already enforced server-side).
@@ -71,7 +75,8 @@ The kid is never shown the answer key. Per problem, render by state (all derivab
 - **Offline / API down:** clear error state, no data fabrication.
 ## 7. Testing
 - **Backend additions** follow the existing TDD pattern (pytest): `Child.pin` set/verify (hashed, wrong-PIN rejected, no-PIN child verifies open), and the scores-summary endpoint (graded attempts only, correct shape, ordering).
-- **Frontend:** component/interaction tests for the core flows (Vitest + React Testing Library) — profile pick + PIN gate, browse→print calls create-attempt, scan upload renders results, and the results detail honors the privacy rules (never renders a correct answer; "not attempted" for null reads). Keep tests behavior-focused, not snapshot-heavy.
+- **Backend (results payload):** `correct_answer` is present only for attempted-wrong rows and `null` for correct and not-attempted rows (the key never ships for blanks).
+- **Frontend:** component/interaction tests for the core flows (Vitest + React Testing Library) — profile pick + PIN gate, browse→print calls create-attempt, scan upload renders results, and the results detail honors the privacy rules (shows the correct answer on attempted-wrong, never on not-attempted/blank reads). Keep tests behavior-focused, not snapshot-heavy.
 - **Manual iPad pass:** print → solve → photograph on the iPad → grade → score recorded, end to end against the real catalog.
 ## 8. Deferred / explicit non-goals
 - Socratic tutor / "Get help" on wrong answers (next phase).
