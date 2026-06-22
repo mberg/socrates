@@ -7,6 +7,18 @@ export interface ProblemResult { problem_id: string; number: number; read_answer
 export interface GradeResult { submission_id: string; attempt_id: string; score_correct: number; score_total: number; needs_review_count: number; identity_ok: boolean; results: ProblemResult[] }
 export interface ScoreSummary { attempt_id: string; code: string | null; worksheet_title: string; section: string; score_correct: number; score_total: number; score_attempted: number; graded_at: string | null }
 
+import type { Visual } from "./components/visuals/types";
+export type { Visual };
+
+export interface TutorTurn {
+  id: string; role: "child" | "tutor"; text: string;
+  input_source: string | null; visuals: Visual[]; tier: number; created_at: string;
+}
+export interface GuidanceSession {
+  id: string; problem_id: string; problem_number: number; problem_prompt: string;
+  max_tier_reached: number; resolved: boolean; turns: TutorTurn[];
+}
+
 async function j<T>(res: Response): Promise<T> {
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}: ${await res.text()}`);
   return res.json() as Promise<T>;
@@ -35,4 +47,13 @@ export const api = {
   },
   getResults: (attemptId: string) => fetch(`/api/attempts/${attemptId}/results`).then(j<GradeResult>),
   getScores: (childId: string) => fetch(`/api/children/${childId}/scores`).then(j<ScoreSummary[]>),
+  startGuidance: (childId: string, attemptId: string, problemId: string) =>
+    fetch(`/api/children/${childId}/attempts/${attemptId}/problems/${problemId}/guidance`,
+      { method: "POST" }).then(j<GuidanceSession>),
+  postTurn: (sessionId: string, body: { text?: string; input_source?: string; advance?: boolean }) =>
+    fetch(`/api/guidance/${sessionId}/turns`, { method: "POST",
+      headers: { "content-type": "application/json" }, body: JSON.stringify(body) }).then(j<GuidanceSession>),
+  getGuidance: (sessionId: string) => fetch(`/api/guidance/${sessionId}`).then(j<GuidanceSession>),
+  resolveGuidance: (sessionId: string) =>
+    fetch(`/api/guidance/${sessionId}/resolve`, { method: "POST" }).then(j<GuidanceSession>),
 };
