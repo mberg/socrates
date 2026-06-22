@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { api, type Attempt, type Child, type GradeResult } from "../api";
+import { api, type AttemptListItem, type Child, type GradeResult } from "../api";
 import { Button } from "./ui/Button";
 import { Card } from "./ui/Card";
 import Results from "./Results";
 
 export default function Scan({ child }: { child: Child }) {
-  const [attempts, setAttempts] = useState<Attempt[]>([]);
-  const [picked, setPicked] = useState<Attempt>();
+  const [attempts, setAttempts] = useState<AttemptListItem[]>([]);
+  const [picked, setPicked] = useState<AttemptListItem>();
   const [file, setFile] = useState<File>();
   const [tricky, setTricky] = useState(false);
   const [grading, setGrading] = useState(false);
@@ -36,7 +36,11 @@ export default function Scan({ child }: { child: Child }) {
   if (picked) return (
     <div className="flex flex-col gap-3">
       <Button variant="ghost" onClick={() => setPicked(undefined)}>← Sheets</Button>
-      <div className="text-lg">Sheet <span className="font-mono font-bold">{picked.code}</span></div>
+      <div>
+        <div className="text-xl font-bold">{picked.worksheet_title}</div>
+        <div className="text-slate-500">{picked.topic} · {picked.section} · sheet <span className="font-mono">{picked.code}</span></div>
+        <a href={api.printUrl(picked.id)} target="_blank" rel="noopener" className="text-indigo-600 underline">Reprint sheet ↗</a>
+      </div>
       <input ref={inputRef} data-testid="photo-input" type="file" accept="image/*" capture="environment"
         onChange={(e) => setFile(e.target.files?.[0])} />
       <label className="flex items-center gap-2">
@@ -52,12 +56,14 @@ export default function Scan({ child }: { child: Child }) {
       <h2 className="text-xl font-bold">Sheets to scan</h2>
       {attempts.length === 0 && <div className="text-slate-500">Nothing to scan — print a sheet first.</div>}
       {attempts.map((a) => (
-        <button key={a.id} onClick={() => setPicked(a)} className="text-left">
-          <Card className="flex items-center justify-between">
-            <span>Sheet <span className="font-mono font-bold">{a.code}</span></span>
-            <span className="text-slate-500">{a.status}</span>
-          </Card>
-        </button>
+        <Card key={a.id} className="flex items-center justify-between gap-3">
+          <button onClick={() => setPicked(a)} className="flex-1 text-left">
+            <div className="font-semibold">{a.worksheet_title}</div>
+            <div className="text-sm text-slate-500">{a.topic} · {a.section} · sheet <span className="font-mono">{a.code}</span></div>
+          </button>
+          <a href={api.printUrl(a.id)} target="_blank" rel="noopener"
+             className="shrink-0 text-indigo-600 underline">Reprint ↗</a>
+        </Card>
       ))}
     </div>
   );

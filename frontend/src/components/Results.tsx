@@ -26,9 +26,21 @@ function Row({ r }: { r: ProblemResult }) {
 }
 
 export default function Results({ result }: { result: GradeResult }) {
+  const attempted = result.results.filter((r) => r.read_answer !== null).length;
+  const pct = result.score_total ? Math.round((result.score_correct / result.score_total) * 100) : 0;
+  const pctAttempted = attempted ? Math.round((result.score_correct / attempted) * 100) : 0;
   return (
     <div className="flex flex-col gap-3">
-      <div className="text-4xl font-extrabold">{result.score_correct}/{result.score_total}</div>
+      <div>
+        <div className="text-4xl font-extrabold">
+          {result.score_correct}/{result.score_total}{" "}
+          <span className="text-2xl font-bold text-slate-500">({pct}%)</span>
+        </div>
+        <div className="text-slate-600">
+          Attempted {attempted} of {result.score_total} · {result.score_correct}/{attempted} correct
+          {attempted ? ` (${pctAttempted}%)` : ""}
+        </div>
+      </div>
       {!result.identity_ok && <div className="text-amber-700">⚠ This photo's code didn't match — is it the right sheet?</div>}
       {result.results.map((r) => <Row key={r.problem_id} r={r} />)}
     </div>
