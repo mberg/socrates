@@ -6,7 +6,7 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.db import get_session
-from app.models import Attempt, Child
+from app.models import Attempt, Child, Skill, Worksheet
 from app.security import hash_pin, verify_pin
 from app.services.attempts import create_attempt
 from app.storage import ObjectStore, default_store
@@ -41,6 +41,20 @@ class PinResult(BaseModel):
 
 class AttemptIn(BaseModel):
     worksheet_id: str
+
+
+class AttemptOut(BaseModel):
+    id: str
+    code: str | None
+    child_id: str
+    worksheet_id: str
+    status: str
+    worksheet_title: str
+    topic: str
+    section: str
+    printed_at: str | None
+    scanned_at: str | None
+    graded_at: str | None
 
 
 def _child_out(c: Child) -> ChildOut:
@@ -84,9 +98,22 @@ async def create_child_attempt(child_id: str, body: AttemptIn,
         raise HTTPException(status_code=404, detail="worksheet not found")
 
 
-@router.get("/children/{child_id}/attempts")
+@router.get("/children/{child_id}/attempts", response_model=list[AttemptOut])
 async def list_child_attempts(child_id: str, session: AsyncSession = Depends(get_session)):
-    return (await session.exec(select(Attempt).where(Attempt.child_id == child_id))).all()
+    rows = (await session.exec(
+        select(Attempt, Worksheet, Skill)
+        .where(Attempt.child_id == child_id)
+        .join(Worksheet, Worksheet.id == Attempt.worksheet_id)
+        .join(Skill, Skill.id == Worksheet.skill_id)
+        .order_by(Attempt.created_at.desc())
+    )).all()
+    return [AttemptOut(
+        id=a.id, code=a.code, child_id=a.child_id, worksheet_id=a.worksheet_id, status=a.status,
+        worksheet_title=w.title, topic=s.topic, section=s.label,
+        printed_at=a.printed_at.isoformat() if a.printed_at else None,
+        scanned_at=a.scanned_at.isoformat() if a.scanned_at else None,
+        graded_at=a.graded_at.isoformat() if a.graded_at else None,
+    ) for a, w, s in rows]
 
 
 @router.get("/attempts/{attempt_id}/print")

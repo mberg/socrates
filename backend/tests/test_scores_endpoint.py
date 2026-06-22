@@ -60,6 +60,9 @@ async def test_scores_lists_only_graded_with_score(client):
     assert row["attempt_id"] == client._graded_id
     assert row["worksheet_title"] == "Adding"
     assert row["score_correct"] == 1 and row["score_total"] == 2
+    assert row["score_attempted"] == 2          # both problems had a non-blank read
+    assert row["section"] == "L"                # skill label
+    assert row["code"] is not None and len(row["code"]) == 5
     assert row["graded_at"] is not None
 
 

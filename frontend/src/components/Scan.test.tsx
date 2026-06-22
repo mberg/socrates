@@ -11,12 +11,17 @@ test("pick a printed attempt, upload a photo, see the score", async () => {
     const u = String(url);
     if (u === "/api/children/k1/attempts")
       return Promise.resolve(new Response(JSON.stringify([
-        { id: "att1", code: "6Q4H7", child_id: "k1", worksheet_id: "w1", status: "printed", printed_at: "t", scanned_at: null, graded_at: null },
+        { id: "att1", code: "6Q4H7", child_id: "k1", worksheet_id: "w1", status: "printed",
+          worksheet_title: "Adding", topic: "math", section: "Addition",
+          printed_at: "t", scanned_at: null, graded_at: null },
       ]), { status: 200 }));
     if (u.endsWith("/submissions") && init?.method === "POST")
       return Promise.resolve(new Response(JSON.stringify({
         submission_id: "s", attempt_id: "att1", score_correct: 2, score_total: 2, needs_review_count: 0, identity_ok: true,
-        results: [{ problem_id: "p1", number: 1, read_answer: "4", is_correct: true, confidence: 1, match_method: "exact", needs_review: false, correct_answer: null }],
+        results: [
+          { problem_id: "p1", number: 1, read_answer: "4", is_correct: true, confidence: 1, match_method: "exact", needs_review: false, correct_answer: null },
+          { problem_id: "p2", number: 2, read_answer: "6", is_correct: true, confidence: 1, match_method: "exact", needs_review: false, correct_answer: null },
+        ],
       }), { status: 200 }));
     return Promise.resolve(new Response("[]", { status: 200 }));
   });
@@ -25,5 +30,5 @@ test("pick a printed attempt, upload a photo, see the score", async () => {
   const file = new File([new Uint8Array([1, 2, 3])], "photo.jpg", { type: "image/jpeg" });
   await userEvent.upload(screen.getByTestId("photo-input"), file);
   await userEvent.click(screen.getByRole("button", { name: /grade/i }));
-  await waitFor(() => expect(screen.getByText("2/2")).toBeInTheDocument());
+  await waitFor(() => expect(screen.getByText(/Attempted 2 of 2/)).toBeInTheDocument());
 });

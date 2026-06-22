@@ -2,9 +2,10 @@ export interface Child { id: string; name: string; grade: number; has_pin: boole
 export interface Skill { id: string; grade: number; topic: string; skill_key: string; label: string }
 export interface Worksheet { id: string; skill_id: string; title: string; variant: string | null; problem_count: number; source_pdf_r2_key: string | null }
 export interface Attempt { id: string; code: string | null; child_id: string; worksheet_id: string; status: string; printed_at: string | null; scanned_at: string | null; graded_at: string | null }
+export interface AttemptListItem { id: string; code: string | null; child_id: string; worksheet_id: string; status: string; worksheet_title: string; topic: string; section: string; printed_at: string | null; scanned_at: string | null; graded_at: string | null }
 export interface ProblemResult { problem_id: string; number: number; read_answer: string | null; is_correct: boolean; confidence: number; match_method: string; needs_review: boolean; correct_answer: string | null }
 export interface GradeResult { submission_id: string; attempt_id: string; score_correct: number; score_total: number; needs_review_count: number; identity_ok: boolean; results: ProblemResult[] }
-export interface ScoreSummary { attempt_id: string; worksheet_title: string; score_correct: number; score_total: number; graded_at: string | null }
+export interface ScoreSummary { attempt_id: string; code: string | null; worksheet_title: string; section: string; score_correct: number; score_total: number; score_attempted: number; graded_at: string | null }
 
 async function j<T>(res: Response): Promise<T> {
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}: ${await res.text()}`);
@@ -24,7 +25,7 @@ export const api = {
   createAttempt: (childId: string, worksheetId: string) =>
     fetch(`/api/children/${childId}/attempts`, { method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ worksheet_id: worksheetId }) }).then(j<Attempt>),
-  listAttempts: (childId: string) => fetch(`/api/children/${childId}/attempts`).then(j<Attempt[]>),
+  listAttempts: (childId: string) => fetch(`/api/children/${childId}/attempts`).then(j<AttemptListItem[]>),
   printUrl: (attemptId: string) => `/api/attempts/${attemptId}/print`,
   uploadSubmission: (childId: string, attemptId: string, file: File, aiFallback: boolean) => {
     const fd = new FormData();

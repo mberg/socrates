@@ -8,7 +8,7 @@ from app.config import settings
 from app.db import get_session
 from app.grading.service import GradeResult, ProblemResultOut, grade_submission
 from app.grading.vision import GeminiVision, Vision
-from app.models import Attempt, Problem, ProblemResult, Submission, Worksheet
+from app.models import Attempt, Problem, ProblemResult, Skill, Submission, Worksheet
 from app.storage import ObjectStore
 
 router = APIRouter(prefix="/api")
@@ -45,9 +45,12 @@ async def create_submission(
 
 class ScoreSummary(BaseModel):
     attempt_id: str
+    code: str | None
     worksheet_title: str
+    section: str
     score_correct: int
     score_total: int
+    score_attempted: int  # problems with a non-blank read
     graded_at: str | None
 
 
@@ -70,11 +73,15 @@ async def child_scores(child_id: str, session: AsyncSession = Depends(get_sessio
             select(ProblemResult).where(ProblemResult.submission_id == sub.id)
         )).all()
         ws = (await session.exec(select(Worksheet).where(Worksheet.id == att.worksheet_id))).first()
+        skill = (await session.exec(select(Skill).where(Skill.id == ws.skill_id))).first() if ws else None
         out.append(ScoreSummary(
             attempt_id=att.id,
+            code=att.code,
             worksheet_title=ws.title if ws else "(unknown)",
+            section=skill.label if skill else "",
             score_correct=sum(1 for r in prs if r.is_correct),
             score_total=len(prs),
+            score_attempted=sum(1 for r in prs if r.read_answer is not None),
             graded_at=att.graded_at.isoformat() if att.graded_at else None,
         ))
     return out
