@@ -74,11 +74,32 @@ VisualAction = Annotated[
 
 _ADAPTER: TypeAdapter = TypeAdapter(VisualAction)
 
+# Canonical Core 6 type names keyed by their alphanumeric-only, lowercased form, so
+# model drift like "numberline"/"NumberLine"/"place value" still maps to the real type.
+_CANONICAL_TYPES = {
+    "".join(c for c in t if c.isalnum()): t
+    for t in ("math", "steps", "number_line", "fraction_bar", "place_value", "mult_grid")
+}
+
+
+def _canonical_type(value: object) -> object:
+    if not isinstance(value, str):
+        return value
+    key = "".join(c for c in value.lower() if c.isalnum())
+    return _CANONICAL_TYPES.get(key, value)
+
 
 def validate_visuals(raw: list[dict]) -> list[BaseModel]:
-    """Validate each raw visual against the Core 6 union; drop invalid/unknown ones."""
+    """Validate each raw visual against the Core 6 union; drop invalid/unknown ones.
+
+    The model occasionally emits collapsed/cased type names (e.g. "numberline"); we
+    normalize `type` to its canonical form before validating so valid visuals aren't
+    silently dropped.
+    """
     out: list[BaseModel] = []
     for item in raw or []:
+        if isinstance(item, dict) and "type" in item:
+            item = {**item, "type": _canonical_type(item["type"])}
         try:
             out.append(_ADAPTER.validate_python(item))
         except ValidationError:

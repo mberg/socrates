@@ -37,7 +37,12 @@ class _Bar(BaseModel):
 
 
 class _VisualOut(BaseModel):
-    """Union-free superset of the Core 6 so Vertex accepts it as a response schema."""
+    """Union-free superset of the Core 6 so Vertex accepts it as a response schema.
+
+    `type` is a lenient str (not a Literal enum): keeping it permissive means an
+    unexpected type never crashes the whole reply parse — validate_visuals normalizes
+    known aliases (e.g. "numberline" -> "number_line") and drops anything truly unknown.
+    """
     type: str
     # math
     tex: str | None = None

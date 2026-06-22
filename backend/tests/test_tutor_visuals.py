@@ -14,6 +14,19 @@ def test_keeps_valid_drops_invalid_and_unknown():
     assert kinds == ["math", "fraction_bar", "mult_grid"]
 
 
+def test_normalizes_type_aliases_so_visuals_are_not_dropped():
+    # The model sometimes emits collapsed type names (e.g. "numberline" instead of
+    # "number_line"). Those must still validate, not be silently dropped.
+    raw = [
+        {"type": "numberline", "min": -10, "max": 0, "jumps": [{"from": -9, "to": -5}]},
+        {"type": "fractionbar", "bars": [{"denominator": 4, "shaded": 3}]},
+        {"type": "MultGrid", "rows": 3, "cols": 4},
+        {"type": "place value", "value": 342},
+    ]
+    kinds = [v.type for v in validate_visuals(raw)]
+    assert kinds == ["number_line", "fraction_bar", "mult_grid", "place_value"]
+
+
 def test_number_line_jump_dicts_use_from_alias():
     # The frontend NumberLine reads `jump.from`; Pydantic stores it as `from_`
     # internally (Python keyword), so the dicts the API emits MUST use the alias.
