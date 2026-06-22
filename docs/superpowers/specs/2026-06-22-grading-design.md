@@ -60,8 +60,8 @@ Datetimes use the existing `_utcnow()` helper (naive UTC) to match Postgres `TIM
 2. **Resolve** — load the Attempt → its Worksheet → the ordered list of that worksheet's `Problem`s (number, prompt, correct_answer).
 3. **Read** — `Vision.read(image_bytes, problems)` (in `asyncio.to_thread`) returns, per problem number, `{number, read_answer, confidence}` plus the **printed Attempt id it sees on the sheet**. The model is handed the problem numbers/prompts so it aligns its reading to the known layout instead of guessing. Blank/unreadable → `read_answer = None`.
 4. **Identity cross-check** — normalize the printed id the model read (strip whitespace) and compare to the request's `attempt_id`. Mismatch → do not grade; surface a "wrong sheet?" error on the Submission. (See §6.)
-5. **Compare per problem** — `grading/compare.py` normalized comparison first; on mismatch **or** low confidence, fall back to `Vision.judge_equivalence(read_answer, correct_answer)`. Record `is_correct` and `match_method` (`exact` / `normalized` / `gemini_equiv`).
-6. **Flag** — low-confidence reads set `needs_review = true` and are still scored (best-effort verdict; the parent can review/override later).
+5. **Compare per problem** — `grading/compare.py` normalized comparison first; **on a code mismatch** (and only when a non-blank answer was read), fall back to `Vision.judge_equivalence(read_answer, correct_answer)`. Record `is_correct` and `match_method` (`exact` / `normalized` / `gemini_equiv`). A code match is trusted as-is — re-judging an already-matched answer would waste a model call.
+6. **Flag** — low-confidence reads set `needs_review = true` and are still scored (best-effort verdict; the parent can review/override later). Low confidence drives the review flag rather than a re-judge: the human-in-the-loop path, not a second model opinion, is what catches an uncertain read.
 7. **Persist** — write all `ProblemResult`s, set `Attempt.graded_at`, status `graded`. Return the graded result (overall score + per-problem rows + a `needs_review` count).
 
 **Per-problem fault isolation:** one unreadable/erroring problem never aborts the sheet — it becomes a blank/error result and grading continues (mirrors the ingest per-file isolation fix).
@@ -81,7 +81,7 @@ Implementations: a **`FakeVision`** (deterministic, configured per test — driv
 - canonicalize fractions (`3/6` → `1/2`), mixed numbers (`1 1/2` ↔ `3/2`), and decimals (`0.50` → `0.5`, trailing zeros);
 - numeric equality when both parse as numbers.
 
-Reuses the arithmetic-normalization ideas already in `app/ingest/validate.py` where applicable. Anything the code can't confidently equate falls through to the Gemini equivalence check, so odd formats and word answers still grade correctly without making the common case nondeterministic.
+Reuses the arithmetic-normalization ideas already in `app/ingest/validate.py` where applicable. Anything the code can't confidently equate (a non-blank read that fails the normalized compare) falls through to the Gemini equivalence check, so odd formats and word answers still grade correctly without making the common case nondeterministic. A blank/unreadable answer is recorded wrong (no fallback); a code match is trusted (no fallback).
 
 ## 6. Attempt resolution & the printed human-readable id
 
