@@ -1,16 +1,71 @@
 import asyncio
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.tutor.base import TutorContext, TutorReply, Turn
-from app.tutor.visuals import VisualAction
+from app.tutor.visuals import validate_visuals
 
 from google import genai
 
 
+# Vertex's `types.Schema` rejects the `discriminator` + oneOf-of-$ref shape that a
+# Pydantic discriminated union (VisualAction) emits. So the *response schema* uses a
+# single flat model spanning the Core 6's fields; `validate_visuals` then coerces each
+# emitted visual back into the proper union and drops anything invalid/unknown.
+class _Step(BaseModel):
+    text: str
+    highlight: bool = False
+
+
+class _Mark(BaseModel):
+    value: float
+    label: str | None = None
+    color: str | None = None
+
+
+class _Jump(BaseModel):
+    from_: float = Field(alias="from")
+    to: float
+    label: str | None = None
+
+    model_config = {"populate_by_name": True}
+
+
+class _Bar(BaseModel):
+    denominator: int
+    shaded: int
+    label: str | None = None
+
+
+class _VisualOut(BaseModel):
+    """Union-free superset of the Core 6 so Vertex accepts it as a response schema."""
+    type: str
+    # math
+    tex: str | None = None
+    display: bool | None = None
+    # steps
+    title: str | None = None
+    steps: list[_Step] | None = None
+    # number_line
+    min: float | None = None
+    max: float | None = None
+    ticks: int | None = None
+    marks: list[_Mark] | None = None
+    jumps: list[_Jump] | None = None
+    # fraction_bar
+    bars: list[_Bar] | None = None
+    # place_value
+    value: float | None = None
+    columns: list[str] | None = None
+    # mult_grid
+    rows: int | None = None
+    cols: int | None = None
+    partial: bool | None = None
+
+
 class _GeminiReply(BaseModel):
     say: str
-    visuals: list[VisualAction] = []
+    visuals: list[_VisualOut] = []
 
 
 _SYSTEM = (
@@ -56,4 +111,6 @@ class GeminiTutor:
             lines.append(f"{t.role.upper()}: {t.text}")
         text = await asyncio.to_thread(self._generate, lines)
         parsed = _GeminiReply.model_validate_json(text)
-        return TutorReply(say=parsed.say, visuals=[v.model_dump() for v in parsed.visuals])
+        raw = [v.model_dump(by_alias=True, exclude_none=True) for v in parsed.visuals]
+        visuals = [v.model_dump() for v in validate_visuals(raw)]
+        return TutorReply(say=parsed.say, visuals=visuals)
