@@ -58,10 +58,12 @@ async def get_results(attempt_id: str, session: AsyncSession = Depends(get_sessi
         .join(Problem, Problem.id == ProblemResult.problem_id)
         .order_by(Problem.number)
     )).all()
-    results = [ProblemResultOut(problem_id=pr.problem_id, number=p.number, read_answer=pr.read_answer,
-                                is_correct=pr.is_correct, confidence=pr.confidence,
-                                match_method=pr.match_method, needs_review=pr.needs_review)
-               for pr, p in rows]
+    results = [ProblemResultOut(
+        problem_id=pr.problem_id, number=p.number, read_answer=pr.read_answer,
+        is_correct=pr.is_correct, confidence=pr.confidence, match_method=pr.match_method,
+        needs_review=pr.needs_review,
+        correct_answer=(p.correct_answer if (pr.read_answer is not None and not pr.is_correct) else None),
+    ) for pr, p in rows]
     return GradeResult(
         submission_id=sub.id, attempt_id=attempt_id,
         score_correct=sum(1 for r in results if r.is_correct), score_total=len(results),

@@ -25,6 +25,7 @@ class ProblemResultOut(BaseModel):
     confidence: float
     match_method: str
     needs_review: bool
+    correct_answer: str | None = None
 
 
 class GradeResult(BaseModel):
@@ -94,9 +95,12 @@ async def grade_submission(*, session: AsyncSession, store: ObjectStore, vision:
         session.add(ProblemResult(submission_id=submission_id, problem_id=p.id,
                                   read_answer=read_answer, is_correct=is_correct,
                                   confidence=confidence, match_method=method, needs_review=needs_review))
-        outs.append(ProblemResultOut(problem_id=p.id, number=p.number, read_answer=read_answer,
-                                     is_correct=is_correct, confidence=confidence,
-                                     match_method=method, needs_review=needs_review))
+        outs.append(ProblemResultOut(
+            problem_id=p.id, number=p.number, read_answer=read_answer,
+            is_correct=is_correct, confidence=confidence, match_method=method,
+            needs_review=needs_review,
+            correct_answer=(p.correct_answer if (read_answer is not None and not is_correct) else None),
+        ))
 
     attempt.graded_at = _utcnow()
     attempt.status = "graded"
