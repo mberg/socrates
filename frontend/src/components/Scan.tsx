@@ -29,7 +29,7 @@ export default function Scan({ child }: { child: Child }) {
   if (result) return (
     <div>
       <Button variant="ghost" onClick={() => { setResult(undefined); setPicked(undefined); setFile(undefined); }}>← Scan another</Button>
-      <div className="mt-3"><Results result={result} /></div>
+      <div className="mt-3"><Results result={result} childId={child.id} attemptId={result.attempt_id} /></div>
     </div>
   );
 

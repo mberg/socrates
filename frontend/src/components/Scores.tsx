@@ -26,7 +26,7 @@ export default function Scores({ child }: { child: Child }) {
           {selected.section} · sheet <span className="font-mono">{selected.code ?? selected.attempt_id.slice(0, 8)}</span>
           {selected.graded_at ? ` · ${selected.graded_at.slice(0, 10)}` : ""}
         </div>
-        <Results result={detail} />
+        <Results result={detail} childId={child.id} attemptId={detail.attempt_id} />
       </div>
     </div>
   );
