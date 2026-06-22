@@ -3,6 +3,7 @@ import type { Child } from "../api";
 import { Button } from "./ui/Button";
 import Print from "./Print";
 import Scan from "./Scan";
+import Scores from "./Scores";
 
 type Tab = "print" | "scan" | "scores";
 
@@ -23,7 +24,7 @@ export default function KidSpace({ child, onHome }: { child: Child; onHome: () =
       </div>
       {tab === "print" && <Print child={child} />}
       {tab === "scan" && <Scan child={child} />}
-      {tab === "scores" && <div className="text-slate-500">My scores (Task 8)</div>}
+      {tab === "scores" && <Scores child={child} />}
     </div>
   );
 }
