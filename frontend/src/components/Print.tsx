@@ -12,7 +12,7 @@ export default function Print({ child }: { child: Child }) {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => { api.listSkills(child.grade).then(setSkills).catch(() => setSkills([])); }, [child.grade]);
-  useEffect(() => { if (skill) api.listWorksheets(skill.id).then(setWorksheets); }, [skill]);
+  useEffect(() => { if (skill) api.listWorksheets(skill.id).then(setWorksheets).catch(() => setWorksheets([])); }, [skill]);
 
   const topics = [...new Set(skills.map((s) => s.topic))].sort();
 

@@ -8,7 +8,7 @@ const result: GradeResult = {
   results: [
     { problem_id: "p1", number: 1, read_answer: "4", is_correct: true, confidence: 1, match_method: "exact", needs_review: false, correct_answer: null },
     { problem_id: "p2", number: 2, read_answer: "7", is_correct: false, confidence: 1, match_method: "normalized", needs_review: false, correct_answer: "6" },
-    { problem_id: "p3", number: 3, read_answer: null, is_correct: false, confidence: 0, match_method: "exact", needs_review: false, correct_answer: null },
+    { problem_id: "p3", number: 3, read_answer: null, is_correct: false, confidence: 0, match_method: "exact", needs_review: false, correct_answer: "10" },
   ],
 };
 

@@ -35,6 +35,10 @@ class PinIn(BaseModel):
     pin: str
 
 
+class PinResult(BaseModel):
+    ok: bool
+
+
 class AttemptIn(BaseModel):
     worksheet_id: str
 
@@ -57,13 +61,13 @@ async def list_children(session: AsyncSession = Depends(get_session)):
     return [_child_out(c) for c in (await session.exec(select(Child))).all()]
 
 
-@router.post("/children/{child_id}/verify-pin")
+@router.post("/children/{child_id}/verify-pin", response_model=PinResult)
 async def verify_child_pin(child_id: str, body: PinIn,
-                           session: AsyncSession = Depends(get_session)) -> dict:
+                           session: AsyncSession = Depends(get_session)) -> PinResult:
     child = (await session.exec(select(Child).where(Child.id == child_id))).first()
     if child is None:
         raise HTTPException(status_code=404, detail="child not found")
-    return {"ok": verify_pin(body.pin, child.pin_hash)}
+    return PinResult(ok=verify_pin(body.pin, child.pin_hash))
 
 
 @router.post("/children/{child_id}/attempts")
