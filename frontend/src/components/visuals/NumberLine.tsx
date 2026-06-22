@@ -1,13 +1,32 @@
 type Mark = { value: number; label?: string | null; color?: string | null };
 type Jump = { from: number; to: number; label?: string | null };
+
+// Snap to a "nice" step (1, 2, 2.5, 5, 10, …) so tick labels land on clean numbers
+// regardless of how many ticks the model asks for (it often picks a count that doesn't
+// divide the range, e.g. 11 ticks over a span of 10 → 0.909 steps → -4.09, -3.18, …).
+function niceStep(range: number, target: number): number {
+  if (range <= 0) return 1;
+  const rough = range / Math.max(1, target);
+  const pow = Math.pow(10, Math.floor(Math.log10(rough)));
+  for (const m of [1, 2, 2.5, 5, 10]) {
+    if (m * pow >= rough) return m * pow;
+  }
+  return 10 * pow;
+}
+
 export default function NumberLine(
   { min, max, ticks, marks = [], jumps = [] }:
   { min: number; max: number; ticks?: number | null; marks?: Mark[]; jumps?: Jump[] }
 ) {
   const W = 320, H = 80, pad = 16;
   const x = (v: number) => pad + ((v - min) / (max - min || 1)) * (W - 2 * pad);
-  const n = ticks && ticks > 0 ? ticks : Math.min(10, Math.max(1, Math.round(max - min)));
-  const tickVals = Array.from({ length: n + 1 }, (_, i) => min + ((max - min) * i) / n);
+  const range = Math.max(0, max - min);
+  const target = ticks && ticks > 0 ? ticks : Math.min(10, Math.max(1, Math.round(range)));
+  const step = niceStep(range, target);
+  const tickVals: number[] = [];
+  for (let v = Math.ceil(min / step) * step; v <= max + step * 1e-9; v += step) {
+    tickVals.push(Math.round(v / step) * step);
+  }
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full max-w-md" role="img" aria-label="number line">
       <line x1={pad} y1={50} x2={W - pad} y2={50} stroke="#334155" strokeWidth={2} />
