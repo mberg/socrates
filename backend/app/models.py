@@ -73,6 +73,7 @@ class Child(SQLModel, table=True):
     id: str = Field(default_factory=_id, primary_key=True)
     name: str
     grade: int
+    pin_hash: str | None = None
     created_at: datetime = Field(default_factory=_utcnow)
 
 
