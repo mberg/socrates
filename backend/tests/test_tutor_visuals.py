@@ -12,3 +12,16 @@ def test_keeps_valid_drops_invalid_and_unknown():
     out = validate_visuals(raw)
     kinds = [v.type for v in out]
     assert kinds == ["math", "fraction_bar", "mult_grid"]
+
+
+def test_number_line_jump_dicts_use_from_alias():
+    # The frontend NumberLine reads `jump.from`; Pydantic stores it as `from_`
+    # internally (Python keyword), so the dicts the API emits MUST use the alias.
+    from app.tutor.service import validate_visuals_to_dicts
+
+    dicts = validate_visuals_to_dicts([
+        {"type": "number_line", "min": -8, "max": 4,
+         "jumps": [{"from": 3, "to": -4, "label": "-7"}]},
+    ])
+    assert dicts[0]["jumps"][0]["from"] == 3
+    assert "from_" not in dicts[0]["jumps"][0]

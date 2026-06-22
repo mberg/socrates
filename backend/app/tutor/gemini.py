@@ -110,5 +110,5 @@ class GeminiTutor:
         text = await asyncio.to_thread(self._generate, lines)
         parsed = _GeminiReply.model_validate_json(text)
         raw = [v.model_dump(by_alias=True, exclude_none=True) for v in parsed.visuals]
-        visuals = [v.model_dump() for v in validate_visuals(raw)]
+        visuals = [v.model_dump(by_alias=True) for v in validate_visuals(raw)]
         return TutorReply(say=parsed.say, visuals=visuals)
