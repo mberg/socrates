@@ -13,11 +13,10 @@ async def client():
 
 
 async def test_root_serves_tester_html(client):
-    resp = await client.get("/")
+    resp = await client.get("/dev")
     assert resp.status_code == 200
     assert resp.headers["content-type"].startswith("text/html")
     body = resp.text
     assert "Socrates" in body
-    # the harness must drive the real grading endpoint
     assert "/submissions" in body
-    assert 'capture="environment"' in body  # phone camera capture
+    assert 'capture="environment"' in body

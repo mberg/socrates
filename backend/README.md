@@ -1,5 +1,36 @@
 # Socrates backend
 
+## Frontend
+
+The React SPA lives in `frontend/`. FastAPI serves the built app at `/` and the
+throwaway dev harness at `/dev`.
+
+### Development (hot-reload against a running backend)
+
+```bash
+cd frontend && npm install
+cd frontend && npm run dev   # Vite dev server; proxies /api and /health to localhost:8000
+```
+
+### Production build
+
+```bash
+cd frontend && npm run build   # outputs to frontend/dist/
+```
+
+Once `frontend/dist/` exists, starting the backend automatically serves the SPA
+at `/`. The `/api/*` and `/health` routes always take precedence because the
+static mount is registered after the API routers.
+
+### Running the backend
+
+```bash
+cd backend && GOOGLE_APPLICATION_CREDENTIALS=/path/to/sa.json uv run uvicorn app.main:app --reload
+```
+
+The dev harness (for testing print → scan → grade without the full React app) is always
+available at `/dev`.
+
 ## Setup
 
 - Install poppler (`pdftotext`) and `uv`:
