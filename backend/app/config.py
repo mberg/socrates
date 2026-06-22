@@ -14,6 +14,12 @@ class Settings(BaseSettings):
     gemini_vertex_project: str = ""
     gemini_vertex_location: str = ""
 
+    # Inline service-account JSON (alternative to GOOGLE_APPLICATION_CREDENTIALS file
+    # path). When set, it authenticates the Vertex client directly. gcp_project_id
+    # overrides gemini_vertex_project when provided.
+    gcp_project_id: str = ""
+    gcp_service_account_key: str = ""
+
     r2_endpoint_url: str = ""
     r2_access_key_id: str = ""
     r2_secret_access_key: str = ""

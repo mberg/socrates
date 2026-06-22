@@ -2,10 +2,9 @@ import asyncio
 
 from pydantic import BaseModel, Field
 
+from app.gcp import make_genai_client
 from app.tutor.base import TutorContext, TutorReply, Turn
 from app.tutor.visuals import validate_visuals
-
-from google import genai
 
 
 # Vertex's `types.Schema` rejects the `discriminator` + oneOf-of-$ref shape that a
@@ -85,10 +84,9 @@ class GeminiTutor:
                  location: str | None = None, client=None) -> None:
         if client is not None:
             self._client = client
-        elif use_vertex:
-            self._client = genai.Client(vertexai=True, project=project, location=location)
         else:
-            self._client = genai.Client(api_key=api_key)
+            self._client = make_genai_client(api_key=api_key, use_vertex=use_vertex,
+                                             project=project, location=location)
         self._model = model
 
     def _generate(self, contents: list[str]) -> str:
