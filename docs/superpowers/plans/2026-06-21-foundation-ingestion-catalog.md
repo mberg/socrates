@@ -12,6 +12,7 @@
 
 - **Python:** 3.12.
 - **ORM:** SQLModel + Alembic + asyncpg; models use `Column(JSON)` (never native arrays) so the same models run on SQLite in tests and Postgres in prod.
+- **Async sessions:** use SQLModel's `AsyncSession` (`from sqlmodel.ext.asyncio.session import AsyncSession`) everywhere a session is typed or created — it provides the `.exec()` used throughout. `async_sessionmaker` and `create_async_engine` still come from `sqlalchemy.ext.asyncio`.
 - **Provider abstraction:** all Gemini and R2 access goes behind the `Extractor` / `ObjectStore` interfaces — never call the SDKs directly from pipeline or API code.
 - **IDs:** primary keys are string UUID4 (`uuid4().hex`).
 - **Grades in scope:** 3 and 5 (grade 4 folder reserved; ingestion must tolerate it being empty).
@@ -167,8 +168,9 @@ git commit -m "feat(backend): scaffold FastAPI app with health endpoint"
 ```python
 from collections.abc import AsyncIterator
 
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlmodel import SQLModel
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.config import settings
 
@@ -191,8 +193,9 @@ async def get_session() -> AsyncIterator[AsyncSession]:
 ```python
 # backend/tests/test_models.py
 import pytest
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlmodel import SQLModel, select
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.models import Problem, Skill, Worksheet
 
@@ -862,8 +865,9 @@ git commit -m "feat(ingest): validation gate (contiguity + arithmetic recompute)
 ```python
 # backend/tests/test_orchestrator.py
 import pytest
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlmodel import SQLModel, select
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.ingest.extractor import Extraction, ExtractedProblem, FakeExtractor
 from app.ingest.orchestrator import ingest_pdf
@@ -940,8 +944,8 @@ Expected: FAIL — `ModuleNotFoundError: No module named 'app.ingest.orchestrato
 import hashlib
 from dataclasses import dataclass
 
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.ingest.extractor import Extractor
 from app.ingest.pdf import PdfPages, load_pdf
@@ -970,7 +974,8 @@ async def _get_or_create_skill(session: AsyncSession, tax) -> Skill:
 
 async def ingest_pdf(path, *, session: AsyncSession, extractor: Extractor, store: ObjectStore,
                      loader=load_pdf) -> IngestOutcome:
-    raw = open(path, "rb").read()
+    with open(path, "rb") as fh:
+        raw = fh.read()
     sha = hashlib.sha256(raw).hexdigest()
     if (await session.exec(select(Worksheet).where(Worksheet.pdf_sha256 == sha))).first():
         return IngestOutcome("skipped", None, None)
@@ -1033,8 +1038,9 @@ git commit -m "feat(ingest): orchestrator — idempotent insert/skip/quarantine"
 # backend/tests/test_catalog_api.py
 import pytest
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlmodel import SQLModel
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.db import get_session
 from app.main import create_app
@@ -1090,8 +1096,8 @@ Expected: FAIL — `ModuleNotFoundError: No module named 'app.api.catalog'`
 
 ```python
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.db import get_session
 from app.models import Problem, Skill, Worksheet
@@ -1208,7 +1214,8 @@ from app.ingest.gemini_extractor import GeminiExtractor
 from app.ingest.orchestrator import ingest_pdf
 from app.config import settings
 from app.storage import InMemoryObjectStore, R2ObjectStore
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from sqlalchemy.ext.asyncio import async_sessionmaker
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 
 def discover_pdfs(root: str) -> list[str]:
