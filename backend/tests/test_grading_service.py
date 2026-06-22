@@ -71,7 +71,7 @@ async def test_low_confidence_flags_needs_review(fixture):
 
 async def test_gemini_equivalence_fallback_on_mismatch(fixture):
     factory, store, attempt_id = fixture
-    # read "1/2" for problem with correct "4" won't code-match; equivalent=True forces a pass
+    # read "four" for problem with correct "4" won't code-match; equivalent=True forces a pass
     vision = FakeVision(VisionRead(printed_id=None, problems=[
         ProblemRead(number=1, read_answer="four", confidence=0.9),
         ProblemRead(number=2, read_answer="6", confidence=0.9),
@@ -123,3 +123,29 @@ async def test_photo_stored_in_object_store(fixture):
                                         attempt=attempt, photo=b"img", ext="jpg")
     key = f"submissions/{result.submission_id}.jpg"
     assert store.get(key) == b"img"
+
+
+async def test_png_photo_stored_with_png_content_type(fixture):
+    factory, _store, attempt_id = fixture
+
+    class _RecordingStore:
+        def __init__(self):
+            self.calls = []
+        def put(self, key, data, content_type):
+            self.calls.append((key, data, content_type))
+            return key
+        def get(self, key):
+            return next(d for k, d, _ in self.calls if k == key)
+
+    rec = _RecordingStore()
+    vision = FakeVision(VisionRead(printed_id=None, problems=[
+        ProblemRead(number=1, read_answer="4", confidence=0.9),
+        ProblemRead(number=2, read_answer="6", confidence=0.9),
+    ]))
+    async with factory() as s:
+        attempt = (await s.exec(select(Attempt).where(Attempt.id == attempt_id))).one()
+        result = await grade_submission(session=s, store=rec, vision=vision,
+                                        attempt=attempt, photo=b"img", ext="png")
+    key, _data, ctype = rec.calls[0]
+    assert key == f"submissions/{result.submission_id}.png"
+    assert ctype == "image/png"
