@@ -9,7 +9,7 @@ from app.tutor.visuals import validate_visuals
 
 
 def validate_visuals_to_dicts(raw: list[dict]) -> list[dict]:
-    return [v.model_dump() for v in validate_visuals(raw)]
+    return [v.model_dump(by_alias=True) for v in validate_visuals(raw)]
 
 
 class TurnView(BaseModel):
@@ -66,7 +66,7 @@ async def _persist_tutor_turn(session, tutor: Tutor, gs: GuidanceSession,
     )).all()]
     ctx = build_context(problem, worksheet, child, child_answer, gs.max_tier_reached)
     reply = await tutor.respond(ctx, history, gs.max_tier_reached)
-    visuals = [v.model_dump() for v in validate_visuals(reply.visuals)]
+    visuals = [v.model_dump(by_alias=True) for v in validate_visuals(reply.visuals)]
     session.add(TutorTurn(session_id=gs.id, role="tutor", text=reply.say,
                           input_source=None, visuals=visuals, tier=gs.max_tier_reached))
     await session.commit()

@@ -1,5 +1,6 @@
 from google import genai
 
+from app.gcp import make_genai_client
 from app.ingest.extractor import Extraction
 from app.ingest.pdf import PdfPages
 
@@ -22,10 +23,8 @@ class GeminiExtractor:
         project: str | None = None,
         location: str | None = None,
     ) -> None:
-        if use_vertex:
-            self._client = genai.Client(vertexai=True, project=project, location=location)
-        else:
-            self._client = genai.Client(api_key=api_key)
+        self._client = make_genai_client(api_key=api_key, use_vertex=use_vertex,
+                                         project=project, location=location)
         self._model = model
 
     def extract(self, pages: PdfPages) -> Extraction:

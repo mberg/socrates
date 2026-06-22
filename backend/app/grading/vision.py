@@ -38,6 +38,8 @@ class FakeVision:
 
 from google import genai
 
+from app.gcp import make_genai_client
+
 
 class _Equivalence(BaseModel):
     equivalent: bool
@@ -71,10 +73,9 @@ class GeminiVision:
     ) -> None:
         if client is not None:
             self._client = client
-        elif use_vertex:
-            self._client = genai.Client(vertexai=True, project=project, location=location)
         else:
-            self._client = genai.Client(api_key=api_key)
+            self._client = make_genai_client(api_key=api_key, use_vertex=use_vertex,
+                                             project=project, location=location)
         self._model = model
 
     def read(self, image: bytes, problems: list[ProblemPrompt]) -> VisionRead:
