@@ -1,0 +1,36 @@
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, expect, test, vi } from "vitest";
+import Tutor from "./Tutor";
+import { api } from "../../api";
+import type { GuidanceSession } from "../../api";
+
+afterEach(() => vi.restoreAllMocks());
+
+const tier1: GuidanceSession = {
+  id: "g1", problem_id: "p", problem_number: 3, problem_prompt: "3 x 4",
+  max_tier_reached: 1, resolved: false,
+  turns: [{ id: "t1", role: "tutor", text: "What operation?", input_source: null,
+            visuals: [{ type: "math", tex: "3 \\times 4" }], tier: 1, created_at: "" }],
+};
+const tier3: GuidanceSession = {
+  ...tier1, max_tier_reached: 3,
+  turns: [...tier1.turns, { id: "t2", role: "tutor", text: "The answer is 12.",
+    input_source: null, visuals: [], tier: 3, created_at: "" }],
+};
+
+test("loads the opening turn and renders its visual", async () => {
+  vi.spyOn(api, "startGuidance").mockResolvedValue(tier1);
+  render(<Tutor childId="c" attemptId="a" problemId="p" onClose={() => {}} />);
+  expect(await screen.findByText("What operation?")).toBeInTheDocument();
+});
+
+test("'show me more' advances and reveals the Tier-3 answer", async () => {
+  vi.spyOn(api, "startGuidance").mockResolvedValue(tier1);
+  const post = vi.spyOn(api, "postTurn").mockResolvedValue(tier3);
+  render(<Tutor childId="c" attemptId="a" problemId="p" onClose={() => {}} />);
+  await screen.findByText("What operation?");
+  await userEvent.click(screen.getByRole("button", { name: /show me more/i }));
+  await waitFor(() => expect(post).toHaveBeenCalledWith("g1", { advance: true }));
+  expect(await screen.findByText(/the answer is 12/i)).toBeInTheDocument();
+});

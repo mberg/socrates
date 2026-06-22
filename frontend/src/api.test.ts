@@ -18,3 +18,22 @@ test("j throws on non-ok", async () => {
   vi.spyOn(global, "fetch").mockResolvedValue(new Response("nope", { status: 500 }));
   await expect(api.listChildren()).rejects.toThrow(/500/);
 });
+
+test("startGuidance posts to the nested problems route", async () => {
+  const session = { id: "g1", problem_id: "p", problem_number: 3, problem_prompt: "3 x 4",
+    max_tier_reached: 1, resolved: false, turns: [] };
+  const spy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+    new Response(JSON.stringify(session), { status: 200, headers: { "content-type": "application/json" } }));
+  const out = await api.startGuidance("c", "a", "p");
+  expect(out.id).toBe("g1");
+  expect(spy).toHaveBeenCalledWith("/api/children/c/attempts/a/problems/p/guidance", { method: "POST" });
+});
+
+test("postTurn sends advance flag as JSON", async () => {
+  const session = { id: "g1", problem_id: "p", problem_number: 3, problem_prompt: "3 x 4",
+    max_tier_reached: 2, resolved: false, turns: [] };
+  const spy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+    new Response(JSON.stringify(session), { status: 200, headers: { "content-type": "application/json" } }));
+  await api.postTurn("g1", { advance: true });
+  expect(spy).toHaveBeenCalledWith("/api/guidance/g1/turns", expect.objectContaining({ method: "POST" }));
+});

@@ -7,6 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from app.api.catalog import router as catalog_router
 from app.api.children import router as children_router
 from app.api.grading import router as grading_router
+from app.api.guidance import router as guidance_router
 
 _BACKEND_DIR = Path(__file__).resolve().parent.parent
 _FRONTEND_DIST = _BACKEND_DIR.parent / "frontend" / "dist"
@@ -27,6 +28,7 @@ def create_app() -> FastAPI:
     app.include_router(catalog_router)
     app.include_router(children_router)
     app.include_router(grading_router)
+    app.include_router(guidance_router)
 
     if _FRONTEND_DIST.is_dir():
         # Mounting at "/" must come AFTER routers so /api and /health win.

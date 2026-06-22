@@ -111,3 +111,29 @@ class ProblemResult(SQLModel, table=True):
     confidence: float
     match_method: str  # "exact" | "normalized" | "gemini_equiv"
     needs_review: bool = False
+
+
+class GuidanceSession(SQLModel, table=True):
+    __tablename__ = "guidance_session"
+    id: str = Field(default_factory=_id, primary_key=True)
+    child_id: str = Field(foreign_key="child.id", index=True)
+    attempt_id: str = Field(foreign_key="attempt.id", index=True)
+    problem_id: str = Field(foreign_key="problem.id", index=True)
+    problem_result_id: str = Field(foreign_key="problem_result.id", index=True)
+    entry_point: str = "post_grade"  # only value in Plan 4; field exists for Plan 5
+    max_tier_reached: int = 1        # server-enforced floor; only this + resolved mutate
+    resolved: bool = False
+    scan_attached: bool = False
+    created_at: datetime = Field(default_factory=_utcnow)
+
+
+class TutorTurn(SQLModel, table=True):
+    __tablename__ = "tutor_turn"
+    id: str = Field(default_factory=_id, primary_key=True)
+    session_id: str = Field(foreign_key="guidance_session.id", index=True)
+    role: str                       # "child" | "tutor"
+    text: str
+    input_source: str | None = None  # "typed" | "voice" for child turns; None for tutor
+    visuals: list = Field(default_factory=list, sa_column=Column(SAJSON))
+    tier: int
+    created_at: datetime = Field(default_factory=_utcnow)

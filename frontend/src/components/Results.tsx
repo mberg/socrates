@@ -1,7 +1,10 @@
+import { useState } from "react";
 import type { GradeResult, ProblemResult } from "../api";
 import { Card } from "./ui/Card";
+import { Button } from "./ui/Button";
+import Tutor from "./tutor/Tutor";
 
-function Row({ r }: { r: ProblemResult }) {
+function Row({ r, onHelp }: { r: ProblemResult; onHelp: (() => void) | null }) {
   const blank = r.read_answer === null;
   return (
     <Card className="flex items-start justify-between">
@@ -20,12 +23,17 @@ function Row({ r }: { r: ProblemResult }) {
           </>
         )}
       </div>
-      {r.needs_review && <span title="check this" className="text-amber-600">⚐</span>}
+      <div className="flex items-center gap-2">
+        {r.needs_review && <span title="check this" className="text-amber-600">⚐</span>}
+        {onHelp && <Button onClick={onHelp} className="px-2 py-1 text-sm">Get help</Button>}
+      </div>
     </Card>
   );
 }
 
-export default function Results({ result }: { result: GradeResult }) {
+export default function Results({ result, childId, attemptId }:
+  { result: GradeResult; childId: string; attemptId: string }) {
+  const [helpProblemId, setHelpProblemId] = useState<string | null>(null);
   const attempted = result.results.filter((r) => r.read_answer !== null).length;
   const pct = result.score_total ? Math.round((result.score_correct / result.score_total) * 100) : 0;
   const pctAttempted = attempted ? Math.round((result.score_correct / attempted) * 100) : 0;
@@ -42,7 +50,14 @@ export default function Results({ result }: { result: GradeResult }) {
         </div>
       </div>
       {!result.identity_ok && <div className="text-amber-700">⚠ This photo's code didn't match — is it the right sheet?</div>}
-      {result.results.map((r) => <Row key={r.problem_id} r={r} />)}
+      {result.results.map((r) => (
+        <Row key={r.problem_id} r={r}
+             onHelp={!r.is_correct && r.read_answer !== null ? () => setHelpProblemId(r.problem_id) : null} />
+      ))}
+      {helpProblemId && (
+        <Tutor childId={childId} attemptId={attemptId} problemId={helpProblemId}
+               onClose={() => setHelpProblemId(null)} />
+      )}
     </div>
   );
 }
