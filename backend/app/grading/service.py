@@ -13,8 +13,8 @@ LOW_CONFIDENCE_THRESHOLD = 0.7
 _MIME_BY_EXT = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png"}
 
 
-class IdentityMismatch(Exception):
-    pass
+def _norm_code(s: str) -> str:
+    return "".join(c for c in s.upper() if c.isalnum())
 
 
 class ProblemResultOut(BaseModel):
@@ -33,6 +33,7 @@ class GradeResult(BaseModel):
     score_correct: int
     score_total: int
     needs_review_count: int
+    identity_ok: bool = True  # did the code read off the photo match the attempt's code?
     results: list[ProblemResultOut]
 
 
@@ -57,8 +58,11 @@ async def grade_submission(*, session: AsyncSession, store: ObjectStore, vision:
         vision.read, photo, [ProblemPrompt(number=p.number, prompt=p.prompt) for p in problems]
     )
 
-    if read.printed_id is not None and read.printed_id.strip().lower() != attempt.id:
-        raise IdentityMismatch(f"photo printed_id {read.printed_id!r} != attempt {attempt.id}")
+    # Advisory identity cross-check: the API already resolved the authoritative
+    # attempt, so a misread/missing code never blocks grading — it just flags.
+    identity_ok = True
+    if read.printed_id and attempt.code:
+        identity_ok = _norm_code(read.printed_id) == _norm_code(attempt.code)
 
     reads = {r.number: r for r in read.problems}
     outs: list[ProblemResultOut] = []
@@ -93,5 +97,6 @@ async def grade_submission(*, session: AsyncSession, store: ObjectStore, vision:
     return GradeResult(
         submission_id=submission_id, attempt_id=attempt.id,
         score_correct=sum(1 for o in outs if o.is_correct), score_total=len(outs),
-        needs_review_count=sum(1 for o in outs if o.needs_review), results=outs,
+        needs_review_count=sum(1 for o in outs if o.needs_review),
+        identity_ok=identity_ok, results=outs,
     )

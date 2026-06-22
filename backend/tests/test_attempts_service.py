@@ -40,6 +40,9 @@ async def test_create_attempt_generates_and_stores_print(session):
     assert attempt.status == "printed"
     assert attempt.printed_at is not None
     assert attempt.print_pdf_r2_key == f"prints/{attempt.id}.pdf"
+    # short, unambiguous code generated for the print stamp + QR
+    assert attempt.code is not None and len(attempt.code) == 5
+    assert all(c in "23456789ABCDEFGHJKMNPQRSTUVWXYZ" for c in attempt.code)
     # the print pdf was stored, is 1 page, and excludes the answer key
     pdf = store.get(attempt.print_pdf_r2_key)
     doc = fitz.open(stream=pdf, filetype="pdf")

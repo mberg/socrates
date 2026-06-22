@@ -185,8 +185,7 @@ $("grade").onclick = async () => {
       { method: "POST", body: fd });
     renderResults(res);
   } catch (e) {
-    $("gradeErr").textContent = e.message + (e.message.includes("409")
-      ? "\n(409 = the photo's printed id didn't match this attempt — wrong sheet?)" : "");
+    $("gradeErr").textContent = e.message;
   } finally { $("grade").textContent = "Upload & grade"; refreshReady(); }
 };
 
@@ -213,9 +212,12 @@ function renderResults(res) {
       <td class="${r.is_correct ? 'ok':'bad'}">${r.is_correct ? '✓' : '✗'}</td>
       <td class="muted">${(r.confidence*100|0)}% · ${r.match_method}${r.needs_review ? ' <span class="flag">⚑ review</span>' : ''}</td>
     </tr>`).join("");
+  const idWarn = (res.identity_ok === false)
+    ? `<div class="err">⚠ the code read off the photo didn't match this attempt — graded anyway (check it's the right sheet)</div>` : "";
   $("resultsBody").innerHTML = `
     <div class="score">${res.score_correct}/${res.score_total}</div>
     <div class="muted">submission ${res.submission_id} · ${res.needs_review_count} flagged for review</div>
+    ${idWarn}
     <table><thead><tr><th>#</th><th>Read</th><th>OK</th><th>Confidence · method</th></tr></thead>
     <tbody>${rows}</tbody></table>`;
 }

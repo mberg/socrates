@@ -19,9 +19,13 @@ def build_print_pdf(source_pdf: bytes, qr_payload: str, caption: str = "") -> by
         page.insert_image(rect, stream=qr_png)
         if caption:
             page.insert_text((rect.x0, rect.y1 + 9), caption, fontsize=6)
-        # Human-readable Attempt id under the QR: a vision model OCRs this off the
-        # photo to cross-check identity — no server-side QR-decode dependency needed.
-        page.insert_text((rect.x0, rect.y1 + 18), qr_payload, fontsize=7, fontname="cour")
+        # Short code under the QR, stamped LARGE + bold in monospace so a person and
+        # the vision model can both read it off a phone photo. It is also the QR
+        # payload; the grading cross-check is advisory (the app supplies the id).
+        page.insert_text((rect.x0, rect.y1 + 17), "CODE", fontsize=6)
+        _CODE_FS = 26
+        code_w = fitz.get_text_length(qr_payload, fontname="cobo", fontsize=_CODE_FS)
+        page.insert_text((x1 - code_w, rect.y1 + 41), qr_payload, fontsize=_CODE_FS, fontname="cobo")
         result = out.tobytes()
         out.close()
         return result

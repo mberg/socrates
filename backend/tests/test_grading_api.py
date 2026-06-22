@@ -80,10 +80,10 @@ async def test_results_before_grading_404(client):
     assert resp.status_code == 404
 
 
-async def test_mismatch_then_results_is_404(client):
-    """A 409 identity mismatch persists a Submission with no ProblemResults.
-    get_results must skip it and return 404 — not a bogus 0/0 response."""
-    mismatch_vision = FakeVision(VisionRead(printed_id="someoneelse", problems=[
+async def test_code_mismatch_grades_anyway_and_flags(client):
+    """The printed-code cross-check is advisory: a mismatch grades the sheet (200)
+    but reports identity_ok=False rather than blocking."""
+    mismatch_vision = FakeVision(VisionRead(printed_id="ZZZZZ", problems=[
         ProblemRead(number=1, read_answer="4", confidence=0.95),
         ProblemRead(number=2, read_answer="6", confidence=0.95),
     ]))
@@ -91,10 +91,12 @@ async def test_mismatch_then_results_is_404(client):
     files = {"file": ("sheet.jpg", b"img-bytes", "image/jpeg")}
     post_resp = await client.post(
         f"/api/children/{client._child_id}/attempts/{client._attempt_id}/submissions", files=files)
-    assert post_resp.status_code == 409
+    assert post_resp.status_code == 200
+    assert post_resp.json()["identity_ok"] is False
+    assert post_resp.json()["score_total"] == 2
 
     get_resp = await client.get(f"/api/attempts/{client._attempt_id}/results")
-    assert get_resp.status_code == 404
+    assert get_resp.status_code == 200
 
 
 async def test_latest_graded_wins_across_two_submissions(client):

@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlmodel import SQLModel, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.grading.service import IdentityMismatch, grade_submission
+from app.grading.service import grade_submission
 from app.grading.vision import FakeVision, ProblemRead, VisionRead
 from app.models import Attempt, Child, Problem, ProblemResult, Skill, Worksheet
 from app.storage import InMemoryObjectStore
@@ -99,16 +99,37 @@ async def test_blank_read_is_wrong_not_skipped(fixture):
     assert by_num[2].is_correct is False  # missing read → blank result
 
 
-async def test_identity_mismatch_raises_and_leaves_scanned(fixture):
+async def test_identity_mismatch_flags_but_still_grades(fixture):
     factory, store, attempt_id = fixture
-    vision = FakeVision(VisionRead(printed_id="someoneelse", problems=[]))
+    # printed code that won't match the attempt's auto-generated code → identity_ok False,
+    # but grading proceeds (the app already resolved the authoritative attempt).
+    vision = FakeVision(VisionRead(printed_id="ZZZZZ", problems=[
+        ProblemRead(number=1, read_answer="4", confidence=0.95),
+        ProblemRead(number=2, read_answer="6", confidence=0.95),
+    ]))
     async with factory() as s:
         attempt = (await s.exec(select(Attempt).where(Attempt.id == attempt_id))).one()
-        with pytest.raises(IdentityMismatch):
-            await grade_submission(session=s, store=store, vision=vision,
-                                   attempt=attempt, photo=b"img", ext="jpg")
+        result = await grade_submission(session=s, store=store, vision=vision,
+                                        attempt=attempt, photo=b"img", ext="jpg")
+    assert result.identity_ok is False
+    assert result.score_total == 2  # graded anyway
     att = await _attempt(factory, attempt_id)
-    assert att.status == "scanned" and att.graded_at is None
+    assert att.status == "graded" and att.graded_at is not None
+
+
+async def test_identity_match_sets_identity_ok(fixture):
+    factory, store, attempt_id = fixture
+    async with factory() as s:
+        attempt = (await s.exec(select(Attempt).where(Attempt.id == attempt_id))).one()
+        code = attempt.code
+        # model reads the same code (lowercased + spaced) → identity_ok True
+        vision = FakeVision(VisionRead(printed_id=f" {code.lower()} ", problems=[
+            ProblemRead(number=1, read_answer="4", confidence=0.95),
+            ProblemRead(number=2, read_answer="6", confidence=0.95),
+        ]))
+        result = await grade_submission(session=s, store=store, vision=vision,
+                                        attempt=attempt, photo=b"img", ext="jpg")
+    assert result.identity_ok is True
 
 
 async def test_photo_stored_in_object_store(fixture):

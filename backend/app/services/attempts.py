@@ -17,8 +17,10 @@ async def create_attempt(*, session: AsyncSession, store: ObjectStore, child: Ch
     attempt = Attempt(child_id=child.id, worksheet_id=worksheet_id, status="printed",
                       printed_at=_utcnow())
     source_pdf = await asyncio.to_thread(store.get, ws.source_pdf_r2_key)
-    caption = f"{child.name} · {ws.title[:40]} · {attempt.id[:8]}"
-    print_pdf = await asyncio.to_thread(build_print_pdf, source_pdf, attempt.id, caption)
+    caption = f"{child.name} · {ws.title[:40]}"
+    # The short code is the QR payload + the big readable stamp; the uuid id stays
+    # internal (PK + API path).
+    print_pdf = await asyncio.to_thread(build_print_pdf, source_pdf, attempt.code, caption)
     print_key = f"prints/{attempt.id}.pdf"
     await asyncio.to_thread(store.put, print_key, print_pdf, "application/pdf")
     attempt.print_pdf_r2_key = print_key
