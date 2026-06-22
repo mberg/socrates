@@ -81,6 +81,9 @@ class GeminiVision:
         parts = [
             _READ_PROMPT,
             f"PROBLEMS:\n{problem_list}",
+            # v1 assumption: camera photos from the iPhone browser are always JPEG.
+            # A non-JPEG (e.g. PNG scan) would be sent with a JPEG MIME declaration —
+            # acceptable because Gemini sniffs content; revisit if PNG sources become common.
             genai.types.Part.from_bytes(data=image, mime_type="image/jpeg"),
         ]
         resp = self._client.models.generate_content(

@@ -47,7 +47,10 @@ async def create_submission(
 @router.get("/attempts/{attempt_id}/results")
 async def get_results(attempt_id: str, session: AsyncSession = Depends(get_session)) -> GradeResult:
     sub = (await session.exec(
-        select(Submission).where(Submission.attempt_id == attempt_id).order_by(Submission.created_at.desc())
+        select(Submission)
+        .where(Submission.attempt_id == attempt_id)
+        .where(Submission.id.in_(select(ProblemResult.submission_id)))
+        .order_by(Submission.created_at.desc())
     )).first()
     if sub is None:
         raise HTTPException(status_code=404, detail="no submission for attempt")

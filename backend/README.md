@@ -89,7 +89,7 @@ Submission images are stored at `submissions/<submission_id>.<ext>` (e.g. `submi
 
 ### Human-readable attempt id cross-check
 
-When an attempt is created, a short human-readable id (e.g. `ABC-1234`) is stamped below the QR code on the print PDF. `GeminiVision.read` extracts this id from the photo (`printed_id`). If `printed_id` does not match the attempt's id, the submission is left in `scanned` status and no `ProblemResult` rows are written, so a photo submitted under the wrong attempt cannot silently produce wrong grades.
+When an attempt is created, the attempt's full 32-char hex UUID (e.g. `3f9a1c4b8e2d7f0a...`) is stamped below the QR code on the print PDF. `GeminiVision.read` extracts this id from the photo (`printed_id`). If `printed_id` does not match the attempt's id, the submission is left in `scanned` status and no `ProblemResult` rows are written, so a photo submitted under the wrong attempt cannot silently produce wrong grades.
 
 ### Running the opt-in real-Vertex E2E test
 

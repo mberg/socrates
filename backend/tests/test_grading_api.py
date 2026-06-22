@@ -44,6 +44,7 @@ async def client():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as c:
         c._child_id, c._attempt_id = child_id, attempt_id
+        c._app = app
         yield c
     await engine.dispose()
 
@@ -77,3 +78,55 @@ async def test_unknown_attempt_404(client):
 async def test_results_before_grading_404(client):
     resp = await client.get(f"/api/attempts/{client._attempt_id}/results")
     assert resp.status_code == 404
+
+
+async def test_mismatch_then_results_is_404(client):
+    """A 409 identity mismatch persists a Submission with no ProblemResults.
+    get_results must skip it and return 404 — not a bogus 0/0 response."""
+    mismatch_vision = FakeVision(VisionRead(printed_id="someoneelse", problems=[
+        ProblemRead(number=1, read_answer="4", confidence=0.95),
+        ProblemRead(number=2, read_answer="6", confidence=0.95),
+    ]))
+    client._app.dependency_overrides[get_vision] = lambda: mismatch_vision
+    files = {"file": ("sheet.jpg", b"img-bytes", "image/jpeg")}
+    post_resp = await client.post(
+        f"/api/children/{client._child_id}/attempts/{client._attempt_id}/submissions", files=files)
+    assert post_resp.status_code == 409
+
+    get_resp = await client.get(f"/api/attempts/{client._attempt_id}/results")
+    assert get_resp.status_code == 404
+
+
+async def test_latest_graded_wins_across_two_submissions(client):
+    """When two graded submissions exist, get_results returns the more recent one."""
+    files = {"file": ("sheet.jpg", b"img-bytes", "image/jpeg")}
+
+    # First submission: 1/2 correct (answer to #2 is wrong: "7" vs correct "6").
+    vision_first = FakeVision(VisionRead(printed_id=None, problems=[
+        ProblemRead(number=1, read_answer="4", confidence=0.95),
+        ProblemRead(number=2, read_answer="7", confidence=0.95),
+    ]))
+    client._app.dependency_overrides[get_vision] = lambda: vision_first
+    r1 = await client.post(
+        f"/api/children/{client._child_id}/attempts/{client._attempt_id}/submissions", files=files)
+    assert r1.status_code == 200
+    assert r1.json()["score_correct"] == 1
+
+    # Second submission: 2/2 correct.
+    vision_second = FakeVision(VisionRead(printed_id=None, problems=[
+        ProblemRead(number=1, read_answer="4", confidence=0.95),
+        ProblemRead(number=2, read_answer="6", confidence=0.95),
+    ]))
+    client._app.dependency_overrides[get_vision] = lambda: vision_second
+    r2 = await client.post(
+        f"/api/children/{client._child_id}/attempts/{client._attempt_id}/submissions", files=files)
+    assert r2.status_code == 200
+    assert r2.json()["score_correct"] == 2
+
+    # GET /results must return the second (latest graded) submission.
+    get_resp = await client.get(f"/api/attempts/{client._attempt_id}/results")
+    assert get_resp.status_code == 200
+    body = get_resp.json()
+    assert body["score_correct"] == 2
+    assert body["score_total"] == 2
+    assert body["submission_id"] == r2.json()["submission_id"]
