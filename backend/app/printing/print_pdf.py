@@ -23,7 +23,7 @@ def build_print_pdf(source_pdf: bytes, qr_payload: str, caption: str = "") -> by
         # the vision model can both read it off a phone photo. It is also the QR
         # payload; the grading cross-check is advisory (the app supplies the id).
         page.insert_text((rect.x0, rect.y1 + 17), "CODE", fontsize=6)
-        _CODE_FS = 26
+        _CODE_FS = 19
         code_w = fitz.get_text_length(qr_payload, fontname="cobo", fontsize=_CODE_FS)
         page.insert_text((x1 - code_w, rect.y1 + 41), qr_payload, fontsize=_CODE_FS, fontname="cobo")
         result = out.tobytes()
