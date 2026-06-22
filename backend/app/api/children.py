@@ -7,6 +7,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.db import get_session
 from app.models import Attempt, Child
+from app.security import hash_pin, verify_pin
 from app.services.attempts import create_attempt
 from app.storage import ObjectStore, default_store
 
@@ -20,23 +21,53 @@ def get_store() -> ObjectStore:
 class ChildIn(BaseModel):
     name: str
     grade: int
+    pin: str | None = None
+
+
+class ChildOut(BaseModel):
+    id: str
+    name: str
+    grade: int
+    has_pin: bool
+
+
+class PinIn(BaseModel):
+    pin: str
+
+
+class PinResult(BaseModel):
+    ok: bool
 
 
 class AttemptIn(BaseModel):
     worksheet_id: str
 
 
-@router.post("/children")
+def _child_out(c: Child) -> ChildOut:
+    return ChildOut(id=c.id, name=c.name, grade=c.grade, has_pin=bool(c.pin_hash))
+
+
+@router.post("/children", response_model=ChildOut)
 async def create_child(body: ChildIn, session: AsyncSession = Depends(get_session)):
-    child = Child(name=body.name, grade=body.grade)
+    child = Child(name=body.name, grade=body.grade,
+                  pin_hash=hash_pin(body.pin) if body.pin else None)
     session.add(child)
     await session.commit()
-    return child
+    return _child_out(child)
 
 
-@router.get("/children")
+@router.get("/children", response_model=list[ChildOut])
 async def list_children(session: AsyncSession = Depends(get_session)):
-    return (await session.exec(select(Child))).all()
+    return [_child_out(c) for c in (await session.exec(select(Child))).all()]
+
+
+@router.post("/children/{child_id}/verify-pin", response_model=PinResult)
+async def verify_child_pin(child_id: str, body: PinIn,
+                           session: AsyncSession = Depends(get_session)) -> PinResult:
+    child = (await session.exec(select(Child).where(Child.id == child_id))).first()
+    if child is None:
+        raise HTTPException(status_code=404, detail="child not found")
+    return PinResult(ok=verify_pin(body.pin, child.pin_hash))
 
 
 @router.post("/children/{child_id}/attempts")
