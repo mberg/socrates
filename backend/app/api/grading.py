@@ -1,0 +1,71 @@
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from sqlmodel import select
+from sqlmodel.ext.asyncio.session import AsyncSession
+
+from app.api.children import get_store
+from app.config import settings
+from app.db import get_session
+from app.grading.service import GradeResult, IdentityMismatch, ProblemResultOut, grade_submission
+from app.grading.vision import GeminiVision, Vision
+from app.models import Attempt, Problem, ProblemResult, Submission
+from app.storage import ObjectStore
+
+router = APIRouter(prefix="/api")
+
+
+def get_vision() -> Vision:
+    return GeminiVision(
+        api_key=settings.gemini_api_key, model=settings.gemini_model,
+        use_vertex=settings.gemini_use_vertex,
+        project=settings.gemini_vertex_project or None,
+        location=settings.gemini_vertex_location or None,
+    )
+
+
+@router.post("/children/{child_id}/attempts/{attempt_id}/submissions")
+async def create_submission(
+    child_id: str, attempt_id: str,
+    file: UploadFile = File(...),
+    session: AsyncSession = Depends(get_session),
+    store: ObjectStore = Depends(get_store),
+    vision: Vision = Depends(get_vision),
+) -> GradeResult:
+    attempt = (await session.exec(
+        select(Attempt).where(Attempt.id == attempt_id, Attempt.child_id == child_id)
+    )).first()
+    if attempt is None:
+        raise HTTPException(status_code=404, detail="attempt not found")
+    photo = await file.read()
+    ext = (file.filename or "photo.jpg").rsplit(".", 1)[-1].lower()
+    try:
+        return await grade_submission(session=session, store=store, vision=vision,
+                                      attempt=attempt, photo=photo, ext=ext)
+    except IdentityMismatch:
+        raise HTTPException(status_code=409, detail="photo does not match this attempt")
+
+
+@router.get("/attempts/{attempt_id}/results")
+async def get_results(attempt_id: str, session: AsyncSession = Depends(get_session)) -> GradeResult:
+    sub = (await session.exec(
+        select(Submission)
+        .where(Submission.attempt_id == attempt_id)
+        .where(Submission.id.in_(select(ProblemResult.submission_id)))
+        .order_by(Submission.created_at.desc())
+    )).first()
+    if sub is None:
+        raise HTTPException(status_code=404, detail="no submission for attempt")
+    rows = (await session.exec(
+        select(ProblemResult, Problem)
+        .where(ProblemResult.submission_id == sub.id)
+        .join(Problem, Problem.id == ProblemResult.problem_id)
+        .order_by(Problem.number)
+    )).all()
+    results = [ProblemResultOut(problem_id=pr.problem_id, number=p.number, read_answer=pr.read_answer,
+                                is_correct=pr.is_correct, confidence=pr.confidence,
+                                match_method=pr.match_method, needs_review=pr.needs_review)
+               for pr, p in rows]
+    return GradeResult(
+        submission_id=sub.id, attempt_id=attempt_id,
+        score_correct=sum(1 for r in results if r.is_correct), score_total=len(results),
+        needs_review_count=sum(1 for r in results if r.needs_review), results=results,
+    )
