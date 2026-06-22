@@ -77,3 +77,23 @@ class Attempt(SQLModel, table=True):
     scanned_at: datetime | None = None
     graded_at: datetime | None = None
     created_at: datetime = Field(default_factory=_utcnow)
+
+
+class Submission(SQLModel, table=True):
+    __tablename__ = "submission"
+    id: str = Field(default_factory=_id, primary_key=True)
+    attempt_id: str = Field(foreign_key="attempt.id", index=True)
+    photo_r2_key: str
+    created_at: datetime = Field(default_factory=_utcnow)
+
+
+class ProblemResult(SQLModel, table=True):
+    __tablename__ = "problem_result"
+    id: str = Field(default_factory=_id, primary_key=True)
+    submission_id: str = Field(foreign_key="submission.id", index=True)
+    problem_id: str = Field(foreign_key="problem.id", index=True)
+    read_answer: str | None = None
+    is_correct: bool
+    confidence: float
+    match_method: str  # "exact" | "normalized" | "gemini_equiv"
+    needs_review: bool = False
