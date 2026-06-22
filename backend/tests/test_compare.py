@@ -1,6 +1,16 @@
 import pytest
 
-from app.grading.compare import answers_match
+from app.grading.compare import answers_match, parses_as_number
+
+
+@pytest.mark.parametrize("s,expected", [
+    ("4", True), ("-4", True), ("12.5", True), ("3/6", True), ("1 1/2", True),
+    ("1,000", True), (" 7 ", True),
+    ("5 R 2", False),       # remainder format — code can't decide
+    ("four", False), ("", False), (None, False), ("yes", False),
+])
+def test_parses_as_number(s, expected):
+    assert parses_as_number(s) is expected
 
 
 @pytest.mark.parametrize("read,correct", [

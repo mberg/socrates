@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -26,6 +26,7 @@ def get_vision() -> Vision:
 async def create_submission(
     child_id: str, attempt_id: str,
     file: UploadFile = File(...),
+    ai_fallback: bool = Form(False),
     session: AsyncSession = Depends(get_session),
     store: ObjectStore = Depends(get_store),
     vision: Vision = Depends(get_vision),
@@ -38,7 +39,7 @@ async def create_submission(
     photo = await file.read()
     ext = (file.filename or "photo.jpg").rsplit(".", 1)[-1].lower()
     return await grade_submission(session=session, store=store, vision=vision,
-                                  attempt=attempt, photo=photo, ext=ext)
+                                  attempt=attempt, photo=photo, ext=ext, ai_fallback=ai_fallback)
 
 
 @router.get("/attempts/{attempt_id}/results")

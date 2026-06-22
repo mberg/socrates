@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.grading.compare import answers_match
+from app.grading.compare import answers_match, parses_as_number
 from app.grading.vision import ProblemPrompt, Vision
 from app.models import Attempt, Problem, ProblemResult, Submission, _id, _utcnow
 from app.storage import ObjectStore
@@ -38,7 +38,8 @@ class GradeResult(BaseModel):
 
 
 async def grade_submission(*, session: AsyncSession, store: ObjectStore, vision: Vision,
-                           attempt: Attempt, photo: bytes, ext: str) -> GradeResult:
+                           attempt: Attempt, photo: bytes, ext: str,
+                           ai_fallback: bool = False) -> GradeResult:
     submission_id = _id()
     key = f"submissions/{submission_id}.{ext}"
     content_type = _MIME_BY_EXT.get(ext.lower(), "application/octet-stream")
@@ -75,8 +76,16 @@ async def grade_submission(*, session: AsyncSession, store: ObjectStore, vision:
             is_correct = True
             method = "exact" if (read_answer or "").strip() == p.correct_answer.strip() else "normalized"
         elif read_answer is not None:
-            is_correct = await asyncio.to_thread(vision.judge_equivalence, read_answer, p.correct_answer)
-            method = "gemini_equiv"
+            # Mismatch on a non-blank read. Trust the code for a clear numeric
+            # difference; only consult Gemini when the code can't parse a side
+            # (a format it doesn't understand) — unless ai_fallback forces it on.
+            code_decisive = parses_as_number(read_answer) and parses_as_number(p.correct_answer)
+            if ai_fallback or not code_decisive:
+                is_correct = await asyncio.to_thread(vision.judge_equivalence, read_answer, p.correct_answer)
+                method = "gemini_equiv"
+            else:
+                is_correct = False
+                method = "normalized"
         else:
             is_correct = False
             method = "exact"

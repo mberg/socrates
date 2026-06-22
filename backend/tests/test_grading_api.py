@@ -99,6 +99,29 @@ async def test_code_mismatch_grades_anyway_and_flags(client):
     assert get_resp.status_code == 200
 
 
+async def test_ai_fallback_form_toggle_changes_scoring(client):
+    """A code-decidable numeric mismatch (#1 read '5' vs correct '4') is wrong by
+    default, but with ai_fallback=true the (equivalent=True) Gemini check marks it
+    right — proving the form toggle reaches the service."""
+    vision = FakeVision(VisionRead(printed_id=None, problems=[
+        ProblemRead(number=1, read_answer="5", confidence=0.95),
+        ProblemRead(number=2, read_answer="6", confidence=0.95),
+    ]), equivalent=True)
+    client._app.dependency_overrides[get_vision] = lambda: vision
+    files = {"file": ("sheet.jpg", b"img-bytes", "image/jpeg")}
+
+    default = await client.post(
+        f"/api/children/{client._child_id}/attempts/{client._attempt_id}/submissions", files=files)
+    assert default.status_code == 200
+    assert default.json()["score_correct"] == 1  # #1 wrong by code, no AI call
+
+    forced = await client.post(
+        f"/api/children/{client._child_id}/attempts/{client._attempt_id}/submissions",
+        files=files, data={"ai_fallback": "true"})
+    assert forced.status_code == 200
+    assert forced.json()["score_correct"] == 2  # #1 rescued by forced Gemini check
+
+
 async def test_latest_graded_wins_across_two_submissions(client):
     """When two graded submissions exist, get_results returns the more recent one."""
     files = {"file": ("sheet.jpg", b"img-bytes", "image/jpeg")}

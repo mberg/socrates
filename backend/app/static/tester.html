@@ -79,6 +79,10 @@
     <input id="attemptId" placeholder="auto-filled after step 3, or paste one">
     <label for="photo">Photo of the completed sheet</label>
     <input id="photo" type="file" accept="image/*" capture="environment">
+    <label style="display:flex; align-items:center; gap:8px; margin-top:10px;">
+      <input type="checkbox" id="aiFallback" style="width:auto;">
+      Use AI equivalence check (slower; for harder/messier sections)
+    </label>
     <button id="grade" disabled>Upload &amp; grade</button>
     <button class="secondary" id="refresh">Refresh latest results</button>
     <div class="err" id="gradeErr"></div>
@@ -181,6 +185,7 @@ $("grade").onclick = async () => {
   try {
     const childId = state.childId || (await firstChildId());
     const fd = new FormData(); fd.append("file", file);
+    fd.append("ai_fallback", $("aiFallback").checked ? "true" : "false");
     const res = await api(`/api/children/${childId}/attempts/${attemptId}/submissions`,
       { method: "POST", body: fd });
     renderResults(res);

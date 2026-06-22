@@ -84,6 +84,54 @@ async def test_gemini_equivalence_fallback_on_mismatch(fixture):
     assert by_num[1].is_correct is True and by_num[1].match_method == "gemini_equiv"
 
 
+async def test_numeric_mismatch_skips_ai_by_default(fixture):
+    factory, store, attempt_id = fixture
+    # read "5" vs correct "4": both parse as numbers, so the code decides "wrong"
+    # WITHOUT calling Gemini — even though this FakeVision would say equivalent.
+    vision = FakeVision(VisionRead(printed_id=None, problems=[
+        ProblemRead(number=1, read_answer="5", confidence=0.95),
+        ProblemRead(number=2, read_answer="6", confidence=0.95),
+    ]), equivalent=True)
+    async with factory() as s:
+        attempt = (await s.exec(select(Attempt).where(Attempt.id == attempt_id))).one()
+        result = await grade_submission(session=s, store=store, vision=vision,
+                                        attempt=attempt, photo=b"img", ext="jpg")
+    by_num = {r.number: r for r in result.results}
+    assert by_num[1].is_correct is False        # code decided, Gemini NOT trusted
+    assert by_num[1].match_method == "normalized"
+
+
+async def test_ai_fallback_forces_gemini_on_numeric_mismatch(fixture):
+    factory, store, attempt_id = fixture
+    vision = FakeVision(VisionRead(printed_id=None, problems=[
+        ProblemRead(number=1, read_answer="5", confidence=0.95),
+        ProblemRead(number=2, read_answer="6", confidence=0.95),
+    ]), equivalent=True)
+    async with factory() as s:
+        attempt = (await s.exec(select(Attempt).where(Attempt.id == attempt_id))).one()
+        result = await grade_submission(session=s, store=store, vision=vision,
+                                        attempt=attempt, photo=b"img", ext="jpg", ai_fallback=True)
+    by_num = {r.number: r for r in result.results}
+    assert by_num[1].is_correct is True          # forced Gemini call, equivalent=True
+    assert by_num[1].match_method == "gemini_equiv"
+
+
+async def test_unparseable_mismatch_uses_gemini_even_by_default(fixture):
+    factory, store, attempt_id = fixture
+    # "four" doesn't parse as a number, so the code can't decide → Gemini fallback
+    # fires even with ai_fallback off (the default).
+    vision = FakeVision(VisionRead(printed_id=None, problems=[
+        ProblemRead(number=1, read_answer="four", confidence=0.9),
+        ProblemRead(number=2, read_answer="6", confidence=0.9),
+    ]), equivalent=True)
+    async with factory() as s:
+        attempt = (await s.exec(select(Attempt).where(Attempt.id == attempt_id))).one()
+        result = await grade_submission(session=s, store=store, vision=vision,
+                                        attempt=attempt, photo=b"img", ext="jpg")
+    by_num = {r.number: r for r in result.results}
+    assert by_num[1].is_correct is True and by_num[1].match_method == "gemini_equiv"
+
+
 async def test_blank_read_is_wrong_not_skipped(fixture):
     factory, store, attempt_id = fixture
     vision = FakeVision(VisionRead(printed_id=None, problems=[
