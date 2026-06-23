@@ -66,6 +66,16 @@ async def test_advance_to_tier3_reveals_answer(client):
     assert "12" in body["turns"][-1]["text"]  # Tier 3 reveals
 
 
+async def test_reveal_jumps_straight_to_tier3(client):
+    child_id, att_id, prob_id = client._ids
+    sid = (await client.post(
+        f"/api/children/{child_id}/attempts/{att_id}/problems/{prob_id}/guidance")).json()["id"]
+    # One "show me the answer" tap from Tier 1 jumps directly to Tier 3 and reveals.
+    body = (await client.post(f"/api/guidance/{sid}/turns", json={"reveal": True})).json()
+    assert body["max_tier_reached"] == 3
+    assert "12" in body["turns"][-1]["text"]
+
+
 async def test_child_turn_records_input_source(client):
     child_id, att_id, prob_id = client._ids
     sid = (await client.post(

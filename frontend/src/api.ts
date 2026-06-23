@@ -50,7 +50,7 @@ export const api = {
   startGuidance: (childId: string, attemptId: string, problemId: string) =>
     fetch(`/api/children/${childId}/attempts/${attemptId}/problems/${problemId}/guidance`,
       { method: "POST" }).then(j<GuidanceSession>),
-  postTurn: (sessionId: string, body: { text?: string; input_source?: string; advance?: boolean }) =>
+  postTurn: (sessionId: string, body: { text?: string; input_source?: string; advance?: boolean; reveal?: boolean }) =>
     fetch(`/api/guidance/${sessionId}/turns`, { method: "POST",
       headers: { "content-type": "application/json" }, body: JSON.stringify(body) }).then(j<GuidanceSession>),
   getGuidance: (sessionId: string) => fetch(`/api/guidance/${sessionId}`).then(j<GuidanceSession>),

@@ -116,8 +116,14 @@ async def start_session(*, session: AsyncSession, tutor: Tutor, child_id: str,
 
 
 async def add_turn(*, session: AsyncSession, tutor: Tutor, gs: GuidanceSession,
-                   text: str | None, input_source: str | None, advance: bool) -> GuidanceSession:
-    if advance and gs.max_tier_reached < 3:
+                   text: str | None, input_source: str | None, advance: bool,
+                   reveal: bool = False) -> GuidanceSession:
+    # reveal ("show me the answer") jumps straight to Tier 3; advance steps one tier.
+    if reveal and gs.max_tier_reached < 3:
+        gs.max_tier_reached = 3
+        session.add(gs)
+        await session.commit()
+    elif advance and gs.max_tier_reached < 3:
         gs.max_tier_reached += 1
         session.add(gs)
         await session.commit()

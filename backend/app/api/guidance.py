@@ -26,6 +26,7 @@ class TurnIn(BaseModel):
     text: str | None = None
     input_source: str | None = None
     advance: bool = False
+    reveal: bool = False
 
 
 async def _get_session_or_404(session: AsyncSession, session_id: str) -> GuidanceSession:
@@ -60,7 +61,7 @@ async def post_turn(session_id: str, body: TurnIn,
                     tutor: Tutor = Depends(get_tutor)):
     gs = await _get_session_or_404(session, session_id)
     gs = await add_turn(session=session, tutor=tutor, gs=gs, text=body.text,
-                        input_source=body.input_source, advance=body.advance)
+                        input_source=body.input_source, advance=body.advance, reveal=body.reveal)
     return await session_view(session, gs)
 
 

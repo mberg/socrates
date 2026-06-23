@@ -16,14 +16,16 @@ const result: GradeResult = {
   ],
 };
 
-test("shows score, the correct answer on attempted-wrong, and nothing on blanks", () => {
+test("shows score and what was written, but never the correct answer (revealed via the tutor)", () => {
   render(<Results result={result} childId="c" attemptId="a" />);
   expect(screen.getByText("1/3")).toBeInTheDocument();
-  // attempted-wrong row reveals the correct answer
-  expect(screen.getByText(/correct answer:\s*6/i)).toBeInTheDocument();
-  // blank row says not attempted and never shows an answer
+  // what the child wrote is shown
+  expect(screen.getByText(/you wrote 7/i)).toBeInTheDocument();
+  // but the correct answer is NOT spoiled on the results screen
+  expect(screen.queryByText(/correct answer/i)).not.toBeInTheDocument();
+  expect(screen.queryByText(/correct answer:\s*6/i)).not.toBeInTheDocument();
+  // blank row says not attempted
   expect(screen.getByText(/not attempted/i)).toBeInTheDocument();
-  expect(screen.queryByText(/correct answer:\s*10/i)).not.toBeInTheDocument();
 });
 
 test("shows a Get help button on attempted-wrong rows and opens the tutor", async () => {
