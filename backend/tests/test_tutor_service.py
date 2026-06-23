@@ -1,9 +1,10 @@
 import pytest
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
-from sqlmodel import SQLModel
+from sqlmodel import SQLModel, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.models import (Attempt, Child, Problem, ProblemResult, Submission, Worksheet)
+from app.models import (Attempt, Child, Problem, ProblemResult, Submission,
+                        TutorTurn, Worksheet)
 from app.tutor.base import FakeTutor
 from app.tutor.service import add_turn, build_context, start_session
 
@@ -57,3 +58,27 @@ async def test_start_then_advance_to_tier3_reveals(fx):
         for _ in range(5):
             gs2 = await add_turn(session=s, tutor=FakeTutor(), gs=gs2, text=None, input_source=None, advance=True)
         assert gs2.max_tier_reached == 3
+
+
+async def test_reveal_states_answer_and_skips_ai(fx):
+    """'Show me the answer' must deterministically present the correct answer
+    without calling the tutor model (which can loop on guiding questions)."""
+    factory, child_id, att_id, prob_id, *_ = fx
+
+    class BoomTutor:
+        async def respond(self, *a, **k):
+            raise AssertionError("the AI must not be called when revealing the answer")
+
+    async with factory() as s:
+        gs = await start_session(session=s, tutor=FakeTutor(), child_id=child_id,
+                                 attempt_id=att_id, problem_id=prob_id)
+        gs = await add_turn(session=s, tutor=BoomTutor(), gs=gs, text=None,
+                            input_source=None, advance=False, reveal=True)
+        assert gs.max_tier_reached == 3
+        turns = (await s.exec(
+            select(TutorTurn).where(TutorTurn.session_id == gs.id).order_by(TutorTurn.created_at)
+        )).all()
+        last = turns[-1]
+        assert last.role == "tutor"
+        assert last.tier == 3
+        assert "12" in last.text  # the problem's correct_answer

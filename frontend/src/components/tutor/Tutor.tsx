@@ -76,7 +76,7 @@ export default function Tutor(
           <Button onClick={showMore} disabled={busy || tier >= 3} className="bg-amber-500">
             Still stuck — show me more
           </Button>
-          <Button onClick={showAnswer} disabled={busy || tier >= 3} variant="secondary">
+          <Button onClick={showAnswer} disabled={busy} variant="secondary">
             Show me the answer
           </Button>
           <Button onClick={resolve} disabled={busy} className="bg-green-600">Got it</Button>

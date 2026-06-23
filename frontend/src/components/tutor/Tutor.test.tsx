@@ -45,6 +45,18 @@ test("'Show me the answer' jumps straight to Tier 3 and reveals", async () => {
   expect(await screen.findByText(/the answer is 12/i)).toBeInTheDocument();
 });
 
+test("'Show me the answer' stays clickable at Tier 3 (show me more is disabled)", async () => {
+  vi.spyOn(api, "startGuidance").mockResolvedValue(tier3);
+  const post = vi.spyOn(api, "postTurn").mockResolvedValue(tier3);
+  render(<Tutor childId="c" attemptId="a" problemId="p" onClose={() => {}} />);
+  await screen.findByText(/the answer is 12/i);
+  expect(screen.getByRole("button", { name: /show me more/i })).toBeDisabled();
+  const reveal = screen.getByRole("button", { name: /show me the answer/i });
+  expect(reveal).toBeEnabled();
+  await userEvent.click(reveal);
+  await waitFor(() => expect(post).toHaveBeenCalledWith("g1", { reveal: true }));
+});
+
 test("'Got it' resolves the session and closes the tutor", async () => {
   vi.spyOn(api, "startGuidance").mockResolvedValue(tier1);
   const resolveSpy = vi.spyOn(api, "resolveGuidance").mockResolvedValue({ ...tier1, resolved: true });

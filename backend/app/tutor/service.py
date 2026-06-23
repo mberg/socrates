@@ -72,6 +72,21 @@ async def _persist_tutor_turn(session, tutor: Tutor, gs: GuidanceSession,
     await session.commit()
 
 
+async def _persist_reveal_turn(session, gs: GuidanceSession, problem) -> None:
+    """Deterministically state the correct answer — no model call.
+
+    "Show me the answer" must always reveal it; routing through the tutor model
+    risks it looping on guiding questions instead of committing to the answer.
+    """
+    answer = problem.correct_answer or ""
+    say = f"The answer is {answer}."
+    raw = [{"type": "math", "tex": f"{problem.prompt} = {answer}", "display": True}] if answer else []
+    visuals = [v.model_dump(by_alias=True) for v in validate_visuals(raw)]
+    session.add(TutorTurn(session_id=gs.id, role="tutor", text=say,
+                          input_source=None, visuals=visuals, tier=gs.max_tier_reached))
+    await session.commit()
+
+
 async def _load_grounding(session, gs: GuidanceSession):
     problem = (await session.exec(select(Problem).where(Problem.id == gs.problem_id))).first()
     worksheet = (await session.exec(select(Worksheet).where(Worksheet.id == problem.worksheet_id))).first()
@@ -132,7 +147,10 @@ async def add_turn(*, session: AsyncSession, tutor: Tutor, gs: GuidanceSession,
                               input_source=input_source or "typed", visuals=[], tier=gs.max_tier_reached))
         await session.commit()
     problem, worksheet, child, child_answer = await _load_grounding(session, gs)
-    await _persist_tutor_turn(session, tutor, gs, problem, worksheet, child, child_answer)
+    if reveal:
+        await _persist_reveal_turn(session, gs, problem)
+    else:
+        await _persist_tutor_turn(session, tutor, gs, problem, worksheet, child, child_answer)
     return gs
 
 
