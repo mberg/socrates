@@ -16,7 +16,7 @@ export interface TutorTurn {
 }
 export interface GuidanceSession {
   id: string; problem_id: string; problem_number: number; problem_prompt: string;
-  max_tier_reached: number; resolved: boolean; turns: TutorTurn[];
+  max_tier_reached: number; resolved: boolean; revealed_at?: string | null; turns: TutorTurn[];
 }
 
 async function j<T>(res: Response): Promise<T> {

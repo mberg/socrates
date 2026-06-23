@@ -82,3 +82,21 @@ async def test_reveal_states_answer_and_skips_ai(fx):
         assert last.role == "tutor"
         assert last.tier == 3
         assert "12" in last.text  # the problem's correct_answer
+        assert last.visuals == []  # no TeX visual — prompts are often prose sentences
+
+
+async def test_reveal_records_click_timestamp(fx):
+    """The first 'Show me the answer' click stamps revealed_at; later turns keep it."""
+    factory, child_id, att_id, prob_id, *_ = fx
+    async with factory() as s:
+        gs = await start_session(session=s, tutor=FakeTutor(), child_id=child_id,
+                                 attempt_id=att_id, problem_id=prob_id)
+        assert gs.revealed_at is None
+        gs = await add_turn(session=s, tutor=FakeTutor(), gs=gs, text=None,
+                            input_source=None, advance=False, reveal=True)
+        assert gs.revealed_at is not None
+        first = gs.revealed_at
+        # a later (non-reveal) turn must not move the recorded click time
+        gs = await add_turn(session=s, tutor=FakeTutor(), gs=gs, text="thanks",
+                            input_source="typed", advance=False, reveal=False)
+        assert gs.revealed_at == first

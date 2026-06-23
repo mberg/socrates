@@ -3,7 +3,7 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.models import (Attempt, Child, GuidanceSession, Problem, ProblemResult,
-                        Submission, TutorTurn, Worksheet)
+                        Submission, TutorTurn, Worksheet, _utcnow)
 from app.tutor.base import Tutor, TutorContext, Turn
 from app.tutor.visuals import validate_visuals
 
@@ -29,6 +29,7 @@ class GuidanceSessionView(BaseModel):
     problem_prompt: str
     max_tier_reached: int
     resolved: bool
+    revealed_at: str | None
     turns: list[TurnView]
 
 
@@ -73,17 +74,17 @@ async def _persist_tutor_turn(session, tutor: Tutor, gs: GuidanceSession,
 
 
 async def _persist_reveal_turn(session, gs: GuidanceSession, problem) -> None:
-    """Deterministically state the correct answer — no model call.
+    """Deterministically state the correct answer — no model call, no visual.
 
     "Show me the answer" must always reveal it; routing through the tutor model
     risks it looping on guiding questions instead of committing to the answer.
+    No visual is attached: prompts are often word-problem sentences, and rendering
+    those as TeX stacks the letters into garbage.
     """
     answer = problem.correct_answer or ""
     say = f"The answer is {answer}."
-    raw = [{"type": "math", "tex": f"{problem.prompt} = {answer}", "display": True}] if answer else []
-    visuals = [v.model_dump(by_alias=True) for v in validate_visuals(raw)]
     session.add(TutorTurn(session_id=gs.id, role="tutor", text=say,
-                          input_source=None, visuals=visuals, tier=gs.max_tier_reached))
+                          input_source=None, visuals=[], tier=gs.max_tier_reached))
     await session.commit()
 
 
@@ -134,8 +135,11 @@ async def add_turn(*, session: AsyncSession, tutor: Tutor, gs: GuidanceSession,
                    text: str | None, input_source: str | None, advance: bool,
                    reveal: bool = False) -> GuidanceSession:
     # reveal ("show me the answer") jumps straight to Tier 3; advance steps one tier.
-    if reveal and gs.max_tier_reached < 3:
-        gs.max_tier_reached = 3
+    if reveal:
+        if gs.max_tier_reached < 3:
+            gs.max_tier_reached = 3
+        if gs.revealed_at is None:  # stamp the first time the answer was revealed
+            gs.revealed_at = _utcnow()
         session.add(gs)
         await session.commit()
     elif advance and gs.max_tier_reached < 3:
@@ -162,6 +166,7 @@ async def session_view(session: AsyncSession, gs: GuidanceSession) -> GuidanceSe
     return GuidanceSessionView(
         id=gs.id, problem_id=gs.problem_id, problem_number=problem.number,
         problem_prompt=problem.prompt, max_tier_reached=gs.max_tier_reached, resolved=gs.resolved,
+        revealed_at=gs.revealed_at.isoformat() if gs.revealed_at else None,
         turns=[TurnView(id=t.id, role=t.role, text=t.text, input_source=t.input_source,
                         visuals=validate_visuals_to_dicts(t.visuals), tier=t.tier,
                         created_at=t.created_at.isoformat()) for t in turns],

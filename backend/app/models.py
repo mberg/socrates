@@ -124,6 +124,7 @@ class GuidanceSession(SQLModel, table=True):
     max_tier_reached: int = 1        # server-enforced floor; only this + resolved mutate
     resolved: bool = False
     scan_attached: bool = False
+    revealed_at: datetime | None = None  # when "Show me the answer" was first clicked
     created_at: datetime = Field(default_factory=_utcnow)
 
 
