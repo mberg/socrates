@@ -35,6 +35,16 @@ test("'show me more' advances and reveals the Tier-3 answer", async () => {
   expect(await screen.findByText(/the answer is 12/i)).toBeInTheDocument();
 });
 
+test("'Show me the answer' jumps straight to Tier 3 and reveals", async () => {
+  vi.spyOn(api, "startGuidance").mockResolvedValue(tier1);
+  const post = vi.spyOn(api, "postTurn").mockResolvedValue(tier3);
+  render(<Tutor childId="c" attemptId="a" problemId="p" onClose={() => {}} />);
+  await screen.findByText("What operation?");
+  await userEvent.click(screen.getByRole("button", { name: /show me the answer/i }));
+  await waitFor(() => expect(post).toHaveBeenCalledWith("g1", { reveal: true }));
+  expect(await screen.findByText(/the answer is 12/i)).toBeInTheDocument();
+});
+
 test("'Got it' resolves the session and closes the tutor", async () => {
   vi.spyOn(api, "startGuidance").mockResolvedValue(tier1);
   const resolveSpy = vi.spyOn(api, "resolveGuidance").mockResolvedValue({ ...tier1, resolved: true });

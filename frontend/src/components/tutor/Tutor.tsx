@@ -37,6 +37,7 @@ export default function Tutor(
     await run(() => api.postTurn(session.id, { text, input_source }));
   };
   const showMore = () => session && run(() => api.postTurn(session.id, { advance: true }));
+  const showAnswer = () => session && run(() => api.postTurn(session.id, { reveal: true }));
   const resolve = async () => {
     if (!session) return;
     setBusy(true); setError(null);
@@ -74,6 +75,9 @@ export default function Tutor(
         <div className="mt-2 flex flex-wrap gap-2">
           <Button onClick={showMore} disabled={busy || tier >= 3} className="bg-amber-500">
             Still stuck — show me more
+          </Button>
+          <Button onClick={showAnswer} disabled={busy || tier >= 3} variant="secondary">
+            Show me the answer
           </Button>
           <Button onClick={resolve} disabled={busy} className="bg-green-600">Got it</Button>
         </div>
