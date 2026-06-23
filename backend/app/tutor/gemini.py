@@ -77,6 +77,10 @@ _SYSTEM = (
     "Help ONLY with this one problem. Use short, encouraging, age-appropriate language. "
     "NEVER state the final answer unless an explicit answer is provided to you in CONTEXT; "
     "if no answer is given, guide with a question or a single next step instead. "
+    "You can see ONLY the final answer the child wrote — you do not know how they got it. "
+    "NEVER claim or assume the method or steps they used (do not say they 'added', "
+    "'multiplied', or used any particular strategy); if their method matters, ASK what "
+    "they did rather than asserting it. "
     "You may include visuals by selecting from the allowed components only. "
     "Tier {tier} guidance: 1=a guiding question giving nothing away; "
     "2=point at the specific slip with one concrete step; 3=full worked solution."
@@ -106,7 +110,8 @@ class GeminiTutor:
             _SYSTEM.format(grade=context.grade, tier=tier),
             f"CONTEXT — problem: {context.problem_prompt}",
             f"CONTEXT — worked example on the sheet: {context.worked_example or '(none)'}",
-            f"CONTEXT — what {context.child_name} wrote: {context.child_answer or '(blank)'}",
+            f"CONTEXT — the final answer {context.child_name} wrote (you do not know how "
+            f"they got it): {context.child_answer or '(blank)'}",
         ]
         if context.correct_answer is not None:
             lines.append(f"CONTEXT — correct answer (Tier 3 unlocked, you may reveal it): {context.correct_answer}")

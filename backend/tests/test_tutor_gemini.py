@@ -34,6 +34,18 @@ async def test_respond_parses_structured_reply():
     assert "12" not in json.dumps(client.models.last["contents"])
 
 
+async def test_prompt_forbids_fabricating_the_childs_method():
+    client = _Client(json.dumps({"say": "hi", "visuals": []}))
+    tutor = GeminiTutor(client=client, model="m")
+    ctx = TutorContext(problem_prompt="6, 4", worked_example=None, grade=4,
+                       child_name="Micah", child_answer="2", correct_answer=None)
+    await tutor.respond(ctx, [], tier=1)
+    contents = json.dumps(client.models.last["contents"]).lower()
+    # The model must be told it only sees the final answer, not how it was reached.
+    assert "never" in contents and "method" in contents
+    assert "do not know how" in contents
+
+
 async def test_response_schema_is_vertex_compatible():
     """Vertex's types.Schema forbids the `discriminator`/oneOf-of-$ref shape that a
     Pydantic discriminated union emits. The schema we hand Gemini must avoid it."""
