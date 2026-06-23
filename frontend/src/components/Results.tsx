@@ -17,9 +17,8 @@ function Row({ r, onHelp }: { r: ProblemResult; onHelp: (() => void) | null }) {
             <span className={r.is_correct ? "text-green-700" : "text-red-700"}>
               {r.is_correct ? "✓" : "✗"} you wrote {r.read_answer}
             </span>
-            {!r.is_correct && r.correct_answer !== null && (
-              <span className="ml-2 text-slate-700">· correct answer: {r.correct_answer}</span>
-            )}
+            {/* Correct answer is intentionally NOT shown here — it's revealed only by
+                working through the tutor ("Get help" → Tier 3). */}
           </>
         )}
       </div>
