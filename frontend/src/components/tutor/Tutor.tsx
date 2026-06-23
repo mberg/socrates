@@ -37,7 +37,18 @@ export default function Tutor(
     await run(() => api.postTurn(session.id, { text, input_source }));
   };
   const showMore = () => session && run(() => api.postTurn(session.id, { advance: true }));
-  const resolve = () => session && run(() => api.resolveGuidance(session.id));
+  const resolve = async () => {
+    if (!session) return;
+    setBusy(true); setError(null);
+    try {
+      await api.resolveGuidance(session.id);
+      onClose();
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const tier = session?.max_tier_reached ?? 1;
   return (
