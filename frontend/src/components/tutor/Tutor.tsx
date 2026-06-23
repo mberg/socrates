@@ -68,6 +68,7 @@ export default function Tutor(
           ))}
           {busy && <div className="text-sm text-slate-400">thinking…</div>}
           {error && <div className="text-sm text-red-600">{error}</div>}
+          {speech.error && <div className="text-sm text-amber-600">{speech.error}</div>}
         </div>
 
         <div className="mt-2 flex flex-wrap gap-2">
