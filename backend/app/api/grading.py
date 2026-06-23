@@ -16,7 +16,8 @@ router = APIRouter(prefix="/api")
 
 def get_vision() -> Vision:
     return GeminiVision(
-        api_key=settings.gemini_api_key, model=settings.gemini_model,
+        api_key=settings.gemini_api_key,
+        model=settings.gemini_vision_model or settings.gemini_model,
         use_vertex=settings.gemini_use_vertex,
         project=settings.gemini_vertex_project or None,
         location=settings.gemini_vertex_location or None,
