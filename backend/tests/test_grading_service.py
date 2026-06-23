@@ -194,7 +194,13 @@ async def test_photo_stored_in_object_store(fixture):
     assert store.get(key) == b"img"
 
 
-async def test_png_photo_stored_with_png_content_type(fixture):
+async def test_photo_is_canonicalized_to_upright_jpeg(fixture):
+    # Any uploaded image is normalized to an upright JPEG before storage, regardless
+    # of the source format/extension.
+    import io
+
+    from PIL import Image
+
     factory, _store, attempt_id = fixture
 
     class _RecordingStore:
@@ -206,6 +212,9 @@ async def test_png_photo_stored_with_png_content_type(fixture):
         def get(self, key):
             return next(d for k, d, _ in self.calls if k == key)
 
+    png_buf = io.BytesIO()
+    Image.new("RGB", (20, 30), "white").save(png_buf, format="PNG")
+
     rec = _RecordingStore()
     vision = FakeVision(VisionRead(printed_id=None, problems=[
         ProblemRead(number=1, read_answer="4", confidence=0.9),
@@ -214,7 +223,8 @@ async def test_png_photo_stored_with_png_content_type(fixture):
     async with factory() as s:
         attempt = (await s.exec(select(Attempt).where(Attempt.id == attempt_id))).one()
         result = await grade_submission(session=s, store=rec, vision=vision,
-                                        attempt=attempt, photo=b"img", ext="png")
-    key, _data, ctype = rec.calls[0]
-    assert key == f"submissions/{result.submission_id}.png"
-    assert ctype == "image/png"
+                                        attempt=attempt, photo=png_buf.getvalue(), ext="png")
+    key, data, ctype = rec.calls[0]
+    assert key == f"submissions/{result.submission_id}.jpg"
+    assert ctype == "image/jpeg"
+    assert Image.open(io.BytesIO(data)).format == "JPEG"

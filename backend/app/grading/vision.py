@@ -47,11 +47,15 @@ class _Equivalence(BaseModel):
 
 _READ_PROMPT = (
     "You are given a photo of a child's completed math worksheet plus the list of "
-    "its numbered problems. For EVERY problem number, return what the child wrote as "
-    "the answer (read_answer), or null if blank/unreadable, with a confidence in "
-    "[0,1]. Also return printed_id: the short 5-character code (letters and digits) "
-    "printed in large monospace under the QR at the top (or null if you can't read "
-    "it). Do not grade — only transcribe."
+    "its numbered problems. The answer is handwritten on the line next to each "
+    "numbered problem; match each answer to its problem by position. "
+    "For EVERY problem number, return EXACTLY what the child handwrote as the answer "
+    "(read_answer), digit for digit, or null if that problem's answer line is blank "
+    "or you cannot read it — with a confidence in [0,1]. "
+    "CRITICAL: transcribe only what is written. NEVER compute, solve, or guess the "
+    "answer yourself; if you can't read it, return null. "
+    "Also return printed_id: the short 5-character code (letters and digits) printed "
+    "in large monospace under the QR at the top (or null if you can't read it)."
 )
 
 _EQUIV_PROMPT = (

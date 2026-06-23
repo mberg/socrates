@@ -5,12 +5,12 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.grading.compare import answers_match, parses_as_number
+from app.grading.image import normalize_for_ocr
 from app.grading.vision import ProblemPrompt, Vision
 from app.models import Attempt, Problem, ProblemResult, Submission, _id, _utcnow
 from app.storage import ObjectStore
 
 LOW_CONFIDENCE_THRESHOLD = 0.7
-_MIME_BY_EXT = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png"}
 
 
 def _norm_code(s: str) -> str:
@@ -41,9 +41,12 @@ class GradeResult(BaseModel):
 async def grade_submission(*, session: AsyncSession, store: ObjectStore, vision: Vision,
                            attempt: Attempt, photo: bytes, ext: str,
                            ai_fallback: bool = False) -> GradeResult:
+    # Apply EXIF orientation + contrast so the OCR (and stored copy) is upright and
+    # legible; normalization always yields JPEG, so store it as such.
+    photo = await asyncio.to_thread(normalize_for_ocr, photo)
+    ext, content_type = "jpg", "image/jpeg"
     submission_id = _id()
     key = f"submissions/{submission_id}.{ext}"
-    content_type = _MIME_BY_EXT.get(ext.lower(), "application/octet-stream")
     await asyncio.to_thread(store.put, key, photo, content_type)
     submission = Submission(id=submission_id, attempt_id=attempt.id, photo_r2_key=key)
     attempt.scanned_at = _utcnow()

@@ -9,6 +9,9 @@ class Settings(BaseSettings):
     # Gemini extraction model. Vertex mode uses Application Default Credentials
     # (set GOOGLE_APPLICATION_CREDENTIALS to the service-account JSON path).
     gemini_model: str = "gemini-3.1-flash-lite"
+    # OCR/handwriting reading is accuracy-critical; default it to a stronger model
+    # than the shared gemini_model. Falls back to gemini_model when blank.
+    gemini_vision_model: str = "gemini-3.5-flash"
     gemini_api_key: str = ""
     gemini_use_vertex: bool = False
     gemini_vertex_project: str = ""
